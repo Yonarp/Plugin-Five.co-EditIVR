@@ -42,6 +42,7 @@ const CustomField = (props: CustomFieldProps) => {
   const [payors, setPayors] = useState([]);
   const [products, setProducts] = useState([]);
   const [practitioner, setPractitioner] = useState(null);
+  const [practitionerList, setPractitionerList] = useState([]);
   const [iCode, setICode] = useState(null);
   const [lCode, setLCode] = useState(null);
   const [eCode, setECode] = useState(null);
@@ -53,18 +54,15 @@ const CustomField = (props: CustomFieldProps) => {
   const [cptWound, setCPTWound] = useState(null);
   const [selectedCompany, setSelectedCompany] = useState("");
   const [selectedCompanySecond, setSelectedCompanySecond] = useState("");
-  const [primaryMemberNumber, setPrimaryMemberNumber] = useState("")
-  const [secondaryMemberNumber, setSecondaryMemberNumber] = useState("")
-  const [primaryGroupNumber, setPrimaryGroupNumber] = useState("")
-  const [secondaryGroupNumber, setSecondaryGroupNumber] = useState()
+  const [primaryMemberNumber, setPrimaryMemberNumber] = useState("");
+  const [secondaryMemberNumber, setSecondaryMemberNumber] = useState("");
+  const [primaryGroupNumber, setPrimaryGroupNumber] = useState("");
+  const [secondaryGroupNumber, setSecondaryGroupNumber] = useState();
 
   const handlePatient = useCallback((patientData, index = null) => {
     setPatient({ data: patientData, index: index });
   }, []);
 
-  const handlePractitioner = useCallback((practitionerData, index = null) => {
-    setPractitioner({ data: practitionerData, index: index });
-  }, []);
 
   const handleButtonClick = () => {
     const fetchData = async () => {
@@ -89,12 +87,12 @@ const CustomField = (props: CustomFieldProps) => {
               (item) => data?.product.___PRD === item.PRD
             );
           });
-          setPrimaryMemberNumber(data?.patient?.Pay1MemberNumber)
-          setSecondaryMemberNumber(data?.patient?.Pay2MemberNumber)
-          setPrimaryGroupNumber(data?.patient?.Pay1Group)
-          setSecondaryGroupNumber(data?.patient?.Pay2Group)
+          setPrimaryMemberNumber(data?.patient?.Pay1MemberNumber);
+          setSecondaryMemberNumber(data?.patient?.Pay2MemberNumber);
+          setPrimaryGroupNumber(data?.patient?.Pay1Group);
+          setSecondaryGroupNumber(data?.patient?.Pay2Group);
           setCDCode(ivr?.ICD10_CD);
-          handlePractitioner(data?.practitioner);
+          setPractitioner(data?.practitioner);
           setCPTWound(ivr?.WoundType);
 
           setAdmitted(ivr?.SNFAttendance ? ivr?.SNFAttendance : false);
@@ -128,7 +126,22 @@ const CustomField = (props: CustomFieldProps) => {
           setPayors(payorArray);
           setSelectedCompany(payorArray[0]?.CompanyName);
           setSelectedCompanySecond(payorArray[1]?.CompanyName);
-          setLoading(false);
+
+          await five.executeFunction(
+            "getAccountPractitioners",
+            {
+              AccountKey: data?.account?.___ACT,
+            },
+            null,
+            null,
+            null,
+            (result) => {
+              const accountData = JSON.parse(result.serverResponse.results);
+              setPractitionerList(accountData.filter(item => item?.Title === "Practitioner"))
+              setPractitioner(accountData.find(item =>  item?.___USR === data?.practitioner.___USR))
+              setLoading(false);
+            }
+          );
         }
       );
     };
@@ -138,7 +151,6 @@ const CustomField = (props: CustomFieldProps) => {
     setDialogOpen(true);
   };
 
-
   function getFormattedDate() {
     const today = new Date();
     const year = today.getFullYear();
@@ -147,14 +159,12 @@ const CustomField = (props: CustomFieldProps) => {
     return `${year}-${month}-${day}`;
   }
 
-
   const handleSubmit = async (readyForSubmit) => {
-
     const IVR = {
       link: selectedRecord.data.editLink,
       patient: patient.data,
       products,
-      practitioner,
+      practitionerKey: practitioner.___USR,
       eCode,
       admitted,
       placeOfService,
@@ -173,10 +183,10 @@ const CustomField = (props: CustomFieldProps) => {
       Date: getFormattedDate(),
       cptWound,
     };
-    console.log("Selected Records Logging")
-     console.log(selectedRecord.data);
-     console.log(IVR);
-     await five.executeFunction(
+    console.log("Selected Records Logging");
+    console.log(practitionerList);
+    console.log(IVR);
+    await five.executeFunction(
       "updateIVR",
       //@ts-ignore
       IVR,
@@ -187,9 +197,9 @@ const CustomField = (props: CustomFieldProps) => {
         console.log(result);
       }
     );
-    
-    handleDialogClose()
-  }
+
+    handleDialogClose();
+  };
 
   const handleProductChange = (event) => {
     const newProduct = products;
@@ -203,21 +213,20 @@ const CustomField = (props: CustomFieldProps) => {
   };
 
   const handleMemberNumber = (primary, event) => {
-    if(primary){
-      setPrimaryMemberNumber(event.target.value)
+    if (primary) {
+      setPrimaryMemberNumber(event.target.value);
     } else {
-      setSecondaryMemberNumber(event.target.value)
+      setSecondaryMemberNumber(event.target.value);
     }
-  }
+  };
 
   const handleGroupNumber = (primary, event) => {
-    if(primary) {
-      setPrimaryGroupNumber(event.target.value)
+    if (primary) {
+      setPrimaryGroupNumber(event.target.value);
+    } else {
+      setSecondaryGroupNumber(event.target.value);
     }
-    else {
-      setSecondaryGroupNumber(event.target.value)
-    }
-  }
+  };
 
   const handleCheckboxChange = (event) => {
     setIsChecked(event.target.checked);
@@ -229,6 +238,10 @@ const CustomField = (props: CustomFieldProps) => {
   const handleCompanyChangeSecond = (event, newValue) => {
     setSelectedCompanySecond(newValue);
   };
+
+  const handlePractitioner = (event) => {
+    setPractitioner(event.target.value)
+  }
 
   const handleICodeChange = (event, newValue) => {
     setICode(newValue);
@@ -311,18 +324,17 @@ const CustomField = (props: CustomFieldProps) => {
             <Typography variant="h6" gutterBottom>
               Insurance Verification Request
             </Typography>
-            <TextField
-              label="Practitioner"
-              fullWidth
-              margin="dense"
-              value={practitioner ? practitioner.data.NameFull : ""}
-              size="small"
-            />
+            <Select fullWidth value={practitioner} onChange={handlePractitioner}>
+              {practitionerList.map((practitioner) => (
+                <MenuItem key={practitioner.___USR} value={practitioner}>
+                  {practitioner.NameFull}
+                </MenuItem>
+              ))}
+            </Select>
             <TextField
               label="NPI"
               fullWidth
               margin="dense"
-              value={practitioner ? practitioner.data.NPI : ""}
               size="small"
             />
 
@@ -343,7 +355,7 @@ const CustomField = (props: CustomFieldProps) => {
                   {...params}
                   label="Primary Payor"
                   margin="normal"
-                  sx={{ minWidth: 200 }} 
+                  sx={{ minWidth: 200 }}
                 />
               )}
             />
@@ -365,8 +377,6 @@ const CustomField = (props: CustomFieldProps) => {
               size="small"
             />
 
-
-      
             <Autocomplete
               options={[...CompanyNames, "Other"]}
               getOptionLabel={(option) => option}
@@ -377,7 +387,7 @@ const CustomField = (props: CustomFieldProps) => {
                   {...params}
                   label="Secondary Payor"
                   margin="normal"
-                  sx={{ minWidth: 200 }} 
+                  sx={{ minWidth: 200 }}
                 />
               )}
             />
@@ -536,45 +546,44 @@ const CustomField = (props: CustomFieldProps) => {
               }}
             >
               <Button
-                  onClick={handleDialogClose}
-                  style={{
-                    width:'100px',
-                    height: "50px",
-                    borderRadius: "0px",
-                    background: "#285C79",
-                    color: "white",
-                    marginRight: "20px",
-                  }}
-                >
-                  Close
-                </Button>
+                onClick={handleDialogClose}
+                style={{
+                  width: "100px",
+                  height: "50px",
+                  borderRadius: "0px",
+                  background: "#285C79",
+                  color: "white",
+                  marginRight: "20px",
+                }}
+              >
+                Close
+              </Button>
               <Button
-                  onClick={() => handleSubmit(null)}
-                  style={{
-                    width:'100px',
-                    height: "50px",
-                    borderRadius: "0px",
-                    background: "#285C79",
-                    color: "white",
-                    marginRight: "20px",
-                  }}
-                >
-                  Save
-                </Button>
+                onClick={() => handleSubmit(null)}
+                style={{
+                  width: "100px",
+                  height: "50px",
+                  borderRadius: "0px",
+                  background: "#285C79",
+                  color: "white",
+                  marginRight: "20px",
+                }}
+              >
+                Save
+              </Button>
               <Button
                 onClick={() => handleSubmit(1)}
-                  style={{
-                    width:'100px',
-                    height: "50px",
-                    borderRadius: "0px",
-                    background: "#285C79",
-                    color: "white",
-                    marginRight: "20px",
-                  }}
-                >
-                  Submit
-                </Button>
-
+                style={{
+                  width: "100px",
+                  height: "50px",
+                  borderRadius: "0px",
+                  background: "#285C79",
+                  color: "white",
+                  marginRight: "20px",
+                }}
+              >
+                Submit
+              </Button>
             </Box>
           </Box>
         </DialogContent>
