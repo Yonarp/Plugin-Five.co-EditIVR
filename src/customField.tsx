@@ -18,9 +18,10 @@ import {
   Select,
   Menu,
   MenuItem,
-} from "@mui/material"; // Ensure you have these imports correctly
+  ListItemButton,
+} from "@mui/material"; 
 
-import { FiveInitialize } from "./FivePluginApi"; // Ensure the correct import path for FiveInitialize
+import { DialogActions, FiveInitialize, FormControl, InputLabel, List } from "./FivePluginApi"; // Ensure the correct import path for FiveInitialize
 import {
   CompanyNames,
   iCodes,
@@ -58,11 +59,83 @@ const CustomField = (props: CustomFieldProps) => {
   const [secondaryMemberNumber, setSecondaryMemberNumber] = useState("");
   const [primaryGroupNumber, setPrimaryGroupNumber] = useState("");
   const [secondaryGroupNumber, setSecondaryGroupNumber] = useState();
+  const [documents, setDocuments] = useState([]);
+  const [secondDialogOpen, setSecondDialogOpen] = useState(false);
+  const [selectedDocument, setSelectedDocument] = useState(null);
+  const [selectedFiles, setSelectedFiles] = useState([]);
+  const [selectedFilesBase64, setSelectedFilesBase64] = useState([]);
+  const [documentTypes, setDocumentTypes] = useState([]);
+  const [documentType, setDocumentType] = useState("");
+  const [otherDocumentType, setOtherDocumentType] = useState("");
+  const [documentName, setDocumentName] = useState("")
+  const [documentNames, setDocumentNames] = useState([])
+  const [documentDialogOpen, setDocumentDialogOpen] = useState(false)
 
   const handlePatient = useCallback((patientData, index = null) => {
     setPatient({ data: patientData, index: index });
   }, []);
 
+  const handleSecondDialogOpen = (document) => {
+    setSelectedDocument(document);
+    setSecondDialogOpen(true);
+  };
+
+  const handleSecondDialogClose = () => {
+    setSecondDialogOpen(false);
+  };
+  const handleDocumentDialogOpen = () => {
+    setDocumentDialogOpen(true);
+  };
+
+  const handleDocumentDialogClose = () => {
+    setDocumentDialogOpen(false);
+  };
+
+  
+  const handleDocumentTypeChange = (event) => {
+    setDocumentType(event.target.value);
+    if (event.target.value !== "other") {
+      setOtherDocumentType("");
+    }
+  };
+
+
+  const handleFileChange = (event) => {
+    const files = Array.from(event.target.files);
+
+    // Convert files to base64 strings
+    files.forEach((file) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setSelectedFilesBase64((prev) => [...prev, reader.result]);
+      };
+      reader.readAsDataURL(file);
+    });
+
+    setSelectedFiles((prev) => [...prev, ...files]);
+    setDocumentTypes((prev) => [
+      ...prev,
+      documentType === "other" ? otherDocumentType : documentType,
+    ]);
+    
+    setDocumentNames((prev) => [...prev, documentName]);
+    setDocuments((prev) => [...prev, {
+      Base64: files,
+      Category: documentType === "other" ? otherDocumentType : documentType,
+      Name: documentName
+
+    } ])
+
+    handleSecondDialogClose();
+  };
+
+  const getDataUri = (base64) => {
+    if (base64.startsWith("data:image/")) {
+      return base64;
+    } else {
+      return `data:image/jpeg;base64,${base64}`;
+    }
+  };
 
   const handleButtonClick = () => {
     const fetchData = async () => {
@@ -81,6 +154,7 @@ const CustomField = (props: CustomFieldProps) => {
           setICode(ivr?.ICD10_I);
           setCPTCode(ivr?.CPTCODE);
           setECode(ivr?.ICD10_E);
+          setDocuments(data.document);
 
           setProducts(() => {
             return productsList.find(
@@ -137,8 +211,14 @@ const CustomField = (props: CustomFieldProps) => {
             null,
             (result) => {
               const accountData = JSON.parse(result.serverResponse.results);
-              setPractitionerList(accountData.filter(item => item?.Title === "Practitioner"))
-              setPractitioner(accountData.find(item =>  item?.___USR === data?.practitioner.___USR))
+              setPractitionerList(
+                accountData.filter((item) => item?.Title === "Practitioner")
+              );
+              setPractitioner(
+                accountData.find(
+                  (item) => item?.___USR === data?.practitioner.___USR
+                )
+              );
               setLoading(false);
             }
           );
@@ -183,8 +263,8 @@ const CustomField = (props: CustomFieldProps) => {
       Date: getFormattedDate(),
       cptWound,
     };
-    console.log("Selected Records Logging");
-    console.log(practitionerList);
+    console.log("Logging Documents");
+    console.log(documents);
     console.log(IVR);
     await five.executeFunction(
       "updateIVR",
@@ -240,8 +320,8 @@ const CustomField = (props: CustomFieldProps) => {
   };
 
   const handlePractitioner = (event) => {
-    setPractitioner(event.target.value)
-  }
+    setPractitioner(event.target.value);
+  };
 
   const handleICodeChange = (event, newValue) => {
     setICode(newValue);
@@ -276,9 +356,7 @@ const CustomField = (props: CustomFieldProps) => {
       </Container>
     );
   }
-  console.log("Data", ivr);
-  console.log("products", products);
-  console.log("Payors", payors);
+
   return (
     <Box>
       <Button
@@ -324,19 +402,18 @@ const CustomField = (props: CustomFieldProps) => {
             <Typography variant="h6" gutterBottom>
               Insurance Verification Request
             </Typography>
-            <Select fullWidth value={practitioner} onChange={handlePractitioner}>
+            <Select
+              fullWidth
+              value={practitioner}
+              onChange={handlePractitioner}
+            >
               {practitionerList.map((practitioner) => (
                 <MenuItem key={practitioner.___USR} value={practitioner}>
                   {practitioner.NameFull}
                 </MenuItem>
               ))}
             </Select>
-            <TextField
-              label="NPI"
-              fullWidth
-              margin="dense"
-              size="small"
-            />
+            <TextField label="NPI" fullWidth margin="dense" size="small" />
 
             <Select fullWidth value={products} onChange={handleProductChange}>
               {productsList.map((product) => (
@@ -506,6 +583,49 @@ const CustomField = (props: CustomFieldProps) => {
                 />
               </Grid>
             </Grid>
+            <Typography variant="h6" mt={3}>
+              Documents:
+            </Typography>
+            {documents.length > 0 ? (
+              <List>
+                {
+                  //@ts-ignore
+                  documents?.map((item, index) => (
+                    <ListItemButton
+                      key={index}
+                      onClick={() => handleSecondDialogOpen(item)}
+                      sx={{
+                        borderBottom: "1px solid #00000033",
+                        color: "black",
+                        "&:hover": {
+                          backgroundColor: "lightblue",
+                        },
+                      }}
+                    >
+                      <Typography variant="body1">{item?.Name}</Typography>
+                    </ListItemButton>
+                  ))
+                }
+              </List>
+            ) : (
+              <Typography variant="body2" mt={3}>
+                No Documents Added
+              </Typography>
+            )}
+            <Button
+            onClick={handleDocumentDialogOpen}
+              style={{
+                width: "150px",
+                height: "50px",
+                borderRadius: "0px",
+                background: "#285C79",
+                color: "white",
+                marginRight: "20px",
+              }}
+            >
+              {" "}
+              Add Documents{" "}
+            </Button>
             <Box display="flex" flexDirection="column">
               <Typography variant="h6" mt={3} mb={3}>
                 Reasons:
@@ -586,6 +706,90 @@ const CustomField = (props: CustomFieldProps) => {
               </Button>
             </Box>
           </Box>
+
+          {/* --------------------------------- Previewing Documents Dialog------------------------------- */}
+          <Dialog
+            open={secondDialogOpen}
+            onClose={handleSecondDialogClose}
+            PaperProps={{
+              style: {
+                minWidth: "70vw",
+                height: "90%", // Sets the dialog to 90% of the screen width
+              },
+            }}
+          >
+            <DialogTitle>Document</DialogTitle>
+            <DialogContent style={{ width: "100%", height: "100%" }}>
+              {selectedDocument && selectedDocument.Base64 && (
+                <img
+                  src={getDataUri(selectedDocument.Base64)}
+                  alt="Document"
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "contain",
+                  }}
+                />
+              )}
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={handleSecondDialogClose} color="primary">
+                Close
+              </Button>
+            </DialogActions>
+          </Dialog>
+
+          {/* -------------------------- Adding Documents Dialog Box ----------------------------------- */}
+          <Dialog open={documentDialogOpen} onClose={handleDocumentDialogClose}>
+            <DialogTitle>Upload Document</DialogTitle>
+            <DialogContent style={{ width: "400px" }}>
+              {/* Fixed width for dialog content */}
+                <TextField
+                    fullWidth
+                    margin="normal"
+                    label="Set Document Name"
+                    value={documentName}
+                    onChange={(e) => setDocumentName(e.target.value)}
+                  />
+              <FormControl fullWidth margin="normal">
+                <InputLabel id="document-type-label">Document Type</InputLabel>
+                <Select
+                  labelId="document-type-label"
+                  value={documentType}
+                  onChange={handleDocumentTypeChange}
+                  label="Document Type"
+                >
+                  <MenuItem value="facesheet">Facesheet</MenuItem>
+                  <MenuItem value="wound notes">Wound Notes</MenuItem>
+                  <MenuItem value="identification">Identification</MenuItem>
+                  <MenuItem value="priorAuthorization">
+                    Prior Authorization
+                  </MenuItem>
+                  <MenuItem value="other">Other</MenuItem>
+                </Select>
+              </FormControl>
+              {documentType === "other" && (
+                <TextField
+                  fullWidth
+                  margin="normal"
+                  label="Specify Document Type"
+                  value={otherDocumentType}
+                  onChange={(e) => setOtherDocumentType(e.target.value)}
+                />
+              )}
+              <input
+                type="file"
+                multiple
+                accept="image/jpeg,image/png,application/pdf"
+                onChange={handleFileChange}
+              />
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={handleDocumentDialogClose} color="primary">
+                Cancel
+              </Button>
+            </DialogActions>
+          </Dialog>
         </DialogContent>
       </Dialog>
     </Box>
