@@ -19,9 +19,15 @@ import {
   Menu,
   MenuItem,
   ListItemButton,
-} from "@mui/material"; 
+} from "@mui/material";
 
-import { DialogActions, FiveInitialize, FormControl, InputLabel, List } from "./FivePluginApi"; // Ensure the correct import path for FiveInitialize
+import {
+  DialogActions,
+  FiveInitialize,
+  FormControl,
+  InputLabel,
+  List,
+} from "./FivePluginApi"; // Ensure the correct import path for FiveInitialize
 import {
   CompanyNames,
   iCodes,
@@ -31,6 +37,7 @@ import {
   productsList,
 } from "./strings";
 import { CustomFieldProps } from "../../../common";
+import { Delete } from "@mui/icons-material";
 
 FiveInitialize();
 
@@ -67,9 +74,10 @@ const CustomField = (props: CustomFieldProps) => {
   const [documentTypes, setDocumentTypes] = useState([]);
   const [documentType, setDocumentType] = useState("");
   const [otherDocumentType, setOtherDocumentType] = useState("");
-  const [documentName, setDocumentName] = useState("")
-  const [documentNames, setDocumentNames] = useState([])
-  const [documentDialogOpen, setDocumentDialogOpen] = useState(false)
+  const [documentName, setDocumentName] = useState("");
+  const [documentNames, setDocumentNames] = useState([]);
+  const [npi, setNPI] = useState("")
+  const [documentDialogOpen, setDocumentDialogOpen] = useState(false);
 
   const handlePatient = useCallback((patientData, index = null) => {
     setPatient({ data: patientData, index: index });
@@ -91,7 +99,6 @@ const CustomField = (props: CustomFieldProps) => {
     setDocumentDialogOpen(false);
   };
 
-  
   const handleDocumentTypeChange = (event) => {
     setDocumentType(event.target.value);
     if (event.target.value !== "other") {
@@ -99,34 +106,65 @@ const CustomField = (props: CustomFieldProps) => {
     }
   };
 
-
   const handleFileChange = (event) => {
     const files = Array.from(event.target.files);
-
-    // Convert files to base64 strings
-    files.forEach((file) => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setSelectedFilesBase64((prev) => [...prev, reader.result]);
-      };
-      reader.readAsDataURL(file);
+    const promises = files.map((file) => {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          resolve(reader.result);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
     });
 
-    setSelectedFiles((prev) => [...prev, ...files]);
-    setDocumentTypes((prev) => [
-      ...prev,
-      documentType === "other" ? otherDocumentType : documentType,
-    ]);
-    
-    setDocumentNames((prev) => [...prev, documentName]);
-    setDocuments((prev) => [...prev, {
-      Base64: files,
-      Category: documentType === "other" ? otherDocumentType : documentType,
-      Name: documentName
+    Promise.all(promises)
+      .then((base64Files) => {
+        setSelectedFiles((prev) => [...prev, ...files]);
+        setSelectedFilesBase64((prev) => [...prev, ...base64Files]);
+        setDocumentTypes((prev) => [
+          ...prev,
+          documentType === "other" ? otherDocumentType : documentType,
+        ]);
+        setDocumentNames((prev) => [...prev, documentName]);
 
-    } ])
+        setDocuments((prev) => [
+          ...prev,
+          ...files.map((file, index) => ({
+            Base64: base64Files[index],
+            Category:
+              documentType === "other" ? otherDocumentType : documentType,
+            Name: documentName,
+          })),
+        ]);
+        console.log("logging base 64 files", base64Files, base64Files[0]);
+        handleDocumentDialogClose();
+        console.log("Logging Documents", documents);
 
-    handleSecondDialogClose();
+        const documentObject = {
+          Base64: base64Files[0],
+          DocumentName: documentName,
+          Category: documentType === "other" ? otherDocumentType : documentType,
+          PatientKey: patient.data.___PAT,
+        };
+
+        five.executeFunction(
+          "pushDocument",
+          //@ts-ignore
+          documentObject,
+          null,
+          null,
+          null,
+          (result) => {
+            console.log("push document executed");
+            console.log(result);
+          }
+        );
+      })
+      .catch((error) => {
+        console.error("Error reading files: ", error);
+      });
   };
 
   const getDataUri = (base64) => {
@@ -168,7 +206,6 @@ const CustomField = (props: CustomFieldProps) => {
           setCDCode(ivr?.ICD10_CD);
           setPractitioner(data?.practitioner);
           setCPTWound(ivr?.WoundType);
-
           setAdmitted(ivr?.SNFAttendance ? ivr?.SNFAttendance : false);
           setPlaceOfService(ivr?.PlaceofService);
 
@@ -176,8 +213,6 @@ const CustomField = (props: CustomFieldProps) => {
             data?.patient?.__PAY1,
             data?.patient?.__PAY2,
           ].filter(Boolean);
-
-          console.log("PAYOR KEYS FOR INSURANCE", payorKeys, data?.patient);
 
           const payorPromises = payorKeys.map((payorKey) => {
             const payorObject = { PayKey: payorKey };
@@ -263,9 +298,7 @@ const CustomField = (props: CustomFieldProps) => {
       Date: getFormattedDate(),
       cptWound,
     };
-    console.log("Logging Documents");
-    console.log(documents);
-    console.log(IVR);
+
     await five.executeFunction(
       "updateIVR",
       //@ts-ignore
@@ -299,6 +332,7 @@ const CustomField = (props: CustomFieldProps) => {
       setSecondaryMemberNumber(event.target.value);
     }
   };
+
 
   const handleGroupNumber = (primary, event) => {
     if (primary) {
@@ -342,6 +376,11 @@ const CustomField = (props: CustomFieldProps) => {
   const handleCPTCodeChange = (event, newValue) => {
     setCPTCode(newValue);
   };
+
+  const handleDeleteDocument = async (document, index) => {
+    console.log("Logging Document", document)
+
+  }
 
   if (loading) {
     return (
@@ -413,7 +452,7 @@ const CustomField = (props: CustomFieldProps) => {
                 </MenuItem>
               ))}
             </Select>
-            <TextField label="NPI" fullWidth margin="dense" size="small" />
+            <TextField label="NPI" fullWidth margin="dense" size="small" value={ivr.account?.NPI} />
 
             <Select fullWidth value={products} onChange={handleProductChange}>
               {productsList.map((product) => (
@@ -468,6 +507,7 @@ const CustomField = (props: CustomFieldProps) => {
                 />
               )}
             />
+
             <TextField
               label="Secondary Member Number"
               fullWidth
@@ -476,6 +516,7 @@ const CustomField = (props: CustomFieldProps) => {
               onChange={() => handleMemberNumber(false, event)}
               size="small"
             />
+
             <TextField
               label="Secondary Group Number"
               fullWidth
@@ -596,13 +637,25 @@ const CustomField = (props: CustomFieldProps) => {
                       onClick={() => handleSecondDialogOpen(item)}
                       sx={{
                         borderBottom: "1px solid #00000033",
+                        display:"flex",
+                        flexDirection: "row",
+                        justifyContent: 'space-between',
                         color: "black",
                         "&:hover": {
                           backgroundColor: "lightblue",
                         },
                       }}
                     >
-                      <Typography variant="body1">{item?.Name}</Typography>
+                      <Typography variant="body2">{item?.Name}</Typography>
+                      <Delete
+                        style={{
+                          fill: "#EC5750",
+                          color: "#EC5750",
+                          cursor: "pointer",
+                          marginLeft: "5px",
+                        }}
+                        onClick = {() => handleDeleteDocument(item, index)}
+                      />
                     </ListItemButton>
                   ))
                 }
@@ -613,7 +666,7 @@ const CustomField = (props: CustomFieldProps) => {
               </Typography>
             )}
             <Button
-            onClick={handleDocumentDialogOpen}
+              onClick={handleDocumentDialogOpen}
               style={{
                 width: "150px",
                 height: "50px",
@@ -744,13 +797,13 @@ const CustomField = (props: CustomFieldProps) => {
             <DialogTitle>Upload Document</DialogTitle>
             <DialogContent style={{ width: "400px" }}>
               {/* Fixed width for dialog content */}
-                <TextField
-                    fullWidth
-                    margin="normal"
-                    label="Set Document Name"
-                    value={documentName}
-                    onChange={(e) => setDocumentName(e.target.value)}
-                  />
+              <TextField
+                fullWidth
+                margin="normal"
+                label="Set Document Name"
+                value={documentName}
+                onChange={(e) => setDocumentName(e.target.value)}
+              />
               <FormControl fullWidth margin="normal">
                 <InputLabel id="document-type-label">Document Type</InputLabel>
                 <Select
