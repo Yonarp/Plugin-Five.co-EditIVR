@@ -76,8 +76,10 @@ const CustomField = (props: CustomFieldProps) => {
   const [otherDocumentType, setOtherDocumentType] = useState("");
   const [documentName, setDocumentName] = useState("");
   const [documentNames, setDocumentNames] = useState([]);
-  const [npi, setNPI] = useState("")
+  const [npi, setNPI] = useState("");
   const [documentDialogOpen, setDocumentDialogOpen] = useState(false);
+  const [comment, setComment] = useState("");
+  const [reasons, setReasons] = useState("");
 
   const handlePatient = useCallback((patientData, index = null) => {
     setPatient({ data: patientData, index: index });
@@ -175,6 +177,12 @@ const CustomField = (props: CustomFieldProps) => {
     }
   };
 
+  const getMimeTypeFromDataUri = (dataUri) => {
+    // Extract the MIME type from the Data URI
+    const mimeType = dataUri.match(/data:([^;]+);base64,/);
+    return mimeType ? mimeType[1] : null;
+  };
+
   const handleButtonClick = () => {
     const fetchData = async () => {
       await five.executeFunction(
@@ -208,6 +216,8 @@ const CustomField = (props: CustomFieldProps) => {
           setCPTWound(ivr?.WoundType);
           setAdmitted(ivr?.SNFAttendance ? ivr?.SNFAttendance : false);
           setPlaceOfService(ivr?.PlaceofService);
+          setComment(ivr?.Comment);
+          setReasons(ivr?.Reason);
 
           const payorKeys = [
             data?.patient?.__PAY1,
@@ -297,6 +307,8 @@ const CustomField = (props: CustomFieldProps) => {
       cptCode,
       Date: getFormattedDate(),
       cptWound,
+      reasons,
+      comment,
     };
 
     await five.executeFunction(
@@ -332,7 +344,6 @@ const CustomField = (props: CustomFieldProps) => {
       setSecondaryMemberNumber(event.target.value);
     }
   };
-
 
   const handleGroupNumber = (primary, event) => {
     if (primary) {
@@ -378,9 +389,8 @@ const CustomField = (props: CustomFieldProps) => {
   };
 
   const handleDeleteDocument = async (document, index) => {
-    console.log("Logging Document", document)
-
-  }
+    console.log("Logging Document", document);
+  };
 
   if (loading) {
     return (
@@ -452,7 +462,13 @@ const CustomField = (props: CustomFieldProps) => {
                 </MenuItem>
               ))}
             </Select>
-            <TextField label="NPI" fullWidth margin="dense" size="small" value={ivr.account?.NPI} />
+            <TextField
+              label="NPI"
+              fullWidth
+              margin="dense"
+              size="small"
+              value={ivr.account?.NPI}
+            />
 
             <Select fullWidth value={products} onChange={handleProductChange}>
               {productsList.map((product) => (
@@ -637,9 +653,9 @@ const CustomField = (props: CustomFieldProps) => {
                       onClick={() => handleSecondDialogOpen(item)}
                       sx={{
                         borderBottom: "1px solid #00000033",
-                        display:"flex",
+                        display: "flex",
                         flexDirection: "row",
-                        justifyContent: 'space-between',
+                        justifyContent: "space-between",
                         color: "black",
                         "&:hover": {
                           backgroundColor: "lightblue",
@@ -647,7 +663,7 @@ const CustomField = (props: CustomFieldProps) => {
                       }}
                     >
                       <Typography variant="body2">{item?.Name}</Typography>
-                      <Delete
+                      {/*  <Delete
                         style={{
                           fill: "#EC5750",
                           color: "#EC5750",
@@ -655,7 +671,14 @@ const CustomField = (props: CustomFieldProps) => {
                           marginLeft: "5px",
                         }}
                         onClick = {() => handleDeleteDocument(item, index)}
-                      />
+                      /> */}
+                      <Typography
+                        variant="body1"
+                        color="#EC5750"
+                        onClick={() => handleDeleteDocument(item, index)}
+                      >
+                        Delete
+                      </Typography>
                     </ListItemButton>
                   ))
                 }
@@ -686,7 +709,9 @@ const CustomField = (props: CustomFieldProps) => {
 
               <TextField
                 rows={3}
+                value={reasons}
                 multiline
+                onChange={(event) => setReasons(event.target.value)}
                 fullWidth
                 placeholder="Reasons"
                 margin="10"
@@ -698,7 +723,9 @@ const CustomField = (props: CustomFieldProps) => {
 
               <TextField
                 rows={3}
+                value={comment}
                 multiline
+                onChange={(event) => setComment(event.target.value)}
                 fullWidth
                 placeholder="Comments"
                 margin="10"
@@ -773,16 +800,31 @@ const CustomField = (props: CustomFieldProps) => {
           >
             <DialogTitle>Document</DialogTitle>
             <DialogContent style={{ width: "100%", height: "100%" }}>
-              {selectedDocument && selectedDocument.Base64 && (
-                <img
-                  src={getDataUri(selectedDocument.Base64)}
-                  alt="Document"
-                  style={{
-                    width: "100%",
-                    height: "100%",
-                    objectFit: "contain",
-                  }}
-                />
+              {selectedDocument && selectedDocument.Base64 ? (
+                getMimeTypeFromDataUri(selectedDocument.Base64) ===
+                "application/pdf" ? (
+                  // Render PDF using iframe
+                  <iframe
+                    src={selectedDocument.Base64}
+                    title="PDF Document"
+                    width="100%"
+                    height="100%"
+                    style={{ border: "none" }}
+                  />
+                ) : (
+                  // Render image
+                  <img
+                    src={selectedDocument.Base64}
+                    alt="Document"
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      objectFit: "contain",
+                    }}
+                  />
+                )
+              ) : (
+                <Typography variant="body2">No document available</Typography>
               )}
             </DialogContent>
             <DialogActions>
