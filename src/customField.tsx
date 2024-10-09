@@ -267,6 +267,15 @@ const CustomField = (props: CustomFieldProps) => {
               setLoading(false);
             }
           );
+
+          await five.executeFunction(
+            "TriggerOpenIVRLog",
+            ivr,
+            null,
+            null,
+            null,
+            async (result) => {}
+          );
         }
       );
     };
