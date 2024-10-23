@@ -1105,9 +1105,21 @@ export const lCodes = [
     "Other",
   ]
 
+  export const cptCodes = [
+    "15271",
+    "15272",
+    "15273",
+    "15274",
+    "15275",
+    "15276",
+    "15277",
+    "15278",
+  ];
+
   export const productsList = [
     { Name: "Zenith - Q4523", QCode: "Q4523", Brand: "Zenith", PRD: '016876A9-65E1-4303-AF66-B438D7E30885' },
     { Name: "Impax - Q4262", QCode: "Q4262", Brand: "Impax", PRD: '0612FAFD-53F6-4C47-B682-D70AFAE52A41' },
     { Name: "Orion - Q4276", QCode: "Q4276", Brand: "Orion", PRD: '4909AE5B-8DEA-4845-91E3-8BED0BED8665' },
     { Name: "Surgraft - Q4268", QCode: "Q4268", Brand: "Surgraft", PRD: '0E067184-4777-49A7-9E8B-A9CAA959485A' }
 ];
+

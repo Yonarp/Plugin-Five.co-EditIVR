@@ -35,6 +35,7 @@ import {
   eCodes,
   mohsCodes,
   productsList,
+  cptCodes,
 } from "./strings";
 import { CustomFieldProps } from "../../../common";
 import { Delete } from "@mui/icons-material";
@@ -55,7 +56,10 @@ const CustomField = (props: CustomFieldProps) => {
   const [lCode, setLCode] = useState(null);
   const [eCode, setECode] = useState(null);
   const [cdCode, setCDCode] = useState(null);
+  const [cptWoundSize1, setCPTWoundSize1] = useState(null);
+  const [cptWoundSize2, setCPTWoundSize2] = useState(null);
   const [cptCode, setCPTCode] = useState(null);
+  const [cptCode2, setCPTCode2] = useState(null);
   const [patient, setPatient] = useState(null);
   const [loading, setLoading] = useState(false);
   const [isChecked, setIsChecked] = useState(false);
@@ -193,12 +197,16 @@ const CustomField = (props: CustomFieldProps) => {
         null,
         async (result) => {
           const data = JSON.parse(result.serverResponse.results);
+          console.log("Data from Open IVR", data);
           const ivr = data.ivr;
           setIVR(data);
           handlePatient(data?.patient);
           setLCode(ivr?.ICD10_L);
           setICode(ivr?.ICD10_I);
           setCPTCode(ivr?.CPTCODE);
+          setCPTCode2(ivr?.CPTCODE2);
+          setCPTWoundSize1(ivr?.WoundSize);
+          setCPTWoundSize2(ivr?.WoundSize2);
           setECode(ivr?.ICD10_E);
           setDocuments(data.document);
 
@@ -268,9 +276,15 @@ const CustomField = (props: CustomFieldProps) => {
             }
           );
 
+          const logObject = {
+            ivr: ivr,
+            ORD: "",
+            type: "IVR",
+          };
+
           await five.executeFunction(
             "TriggerOpenIVRLog",
-            ivr,
+            logObject,
             null,
             null,
             null,
@@ -316,8 +330,12 @@ const CustomField = (props: CustomFieldProps) => {
       cptCode,
       Date: getFormattedDate(),
       cptWound,
+      cptWoundSize1,
+      cptWoundSize2,
+      cptCode2,
       reasons,
       comment,
+      IVRKey: ivr.ivr.___IVR,
     };
 
     await five.executeFunction(
@@ -400,6 +418,8 @@ const CustomField = (props: CustomFieldProps) => {
   const handleDeleteDocument = async (document, index) => {
     console.log("Logging Document", document);
   };
+// LOG Delete Later
+  console.log("Logging CPT Codes and wounds", cptWoundSize1, cptWoundSize2, cptCode, cptCode2)
 
   if (loading) {
     return (
@@ -509,6 +529,7 @@ const CustomField = (props: CustomFieldProps) => {
               onChange={() => handleMemberNumber(true, event)}
               size="small"
             />
+
             <TextField
               label="Primary Group Number"
               fullWidth
@@ -550,6 +571,7 @@ const CustomField = (props: CustomFieldProps) => {
               onChange={() => handleGroupNumber(false, event)}
               size="small"
             />
+
             <Grid container spacing={1} marginTop={1}>
               {products && products.length > 0 && products[0]?.name && (
                 <Grid item xs={6}>
@@ -564,8 +586,9 @@ const CustomField = (props: CustomFieldProps) => {
                 </Grid>
               )}
             </Grid>
+
             <Typography variant="h6" mt={3}>
-              Codes:
+              ICD10 Codes:
             </Typography>
             <Grid container spacing={2} marginTop={1}>
               <Grid item xs={3}>
@@ -632,9 +655,24 @@ const CustomField = (props: CustomFieldProps) => {
                   )}
                 />
               </Grid>
-              <Grid item xs={3}>
+            </Grid>
+            <Typography variant="h6" mt={3}>
+              CPT Code:
+            </Typography>
+            <Grid container spacing={2} marginTop={1}>
+              <Grid item>
+                <TextField
+                  label="Wound Size 1"
+                  type="number"
+                  variant="outlined"
+                  value={cptWoundSize1}
+                  onChange={(e) => setCPTWoundSize1(e.target.value)}
+                  sx={{ width: '120px' }}
+                />
+              </Grid>
+              <Grid item>
                 <Autocomplete
-                  options={mohsCodes}
+                  options={cptCodes}
                   getOptionLabel={(option) => option}
                   value={cptCode}
                   onChange={handleCPTCodeChange}
@@ -642,7 +680,37 @@ const CustomField = (props: CustomFieldProps) => {
                     <TextField
                       {...params}
                       label="CPT Code"
-                      margin="normal"
+                      variant="outlined"
+                      sx={{ width: '150px' }}
+                      // Adjust the width here
+                    />
+                  )}
+                />
+              </Grid>
+              <Grid item>
+              <TextField
+                  label="Wound Size 2"
+                  type="number"
+                  variant="outlined"
+                  value={cptWoundSize2}
+                  onChange={(e) => setCPTWoundSize2(e.target.value)}
+                  sx={{ width: '120px' }}
+                />
+              </Grid>
+              <Grid item>
+                <Autocomplete
+                  
+                  options={cptCodes}
+                  getOptionLabel={(option) => option}
+                  value={cptCode2}
+                  onChange={(e,newValue) => setCPTCode2(newValue)}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      label="CPT Code 2"
+                      variant="outlined"
+                      sx={{ width: '150px' }}
+                    
                       // Adjust the width here
                     />
                   )}
