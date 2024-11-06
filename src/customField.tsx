@@ -144,9 +144,9 @@ const CustomField = (props: CustomFieldProps) => {
             Name: documentName,
           })),
         ]);
-        console.log("logging base 64 files", base64Files, base64Files[0]);
+  
         handleDocumentDialogClose();
-        console.log("Logging Documents", documents);
+     
 
         const documentObject = {
           Base64: base64Files[0],
@@ -163,8 +163,7 @@ const CustomField = (props: CustomFieldProps) => {
           null,
           null,
           (result) => {
-            console.log("push document executed");
-            console.log(result);
+       
           }
         );
       })
@@ -197,7 +196,6 @@ const CustomField = (props: CustomFieldProps) => {
         null,
         async (result) => {
           const data = JSON.parse(result.serverResponse.results);
-          console.log("Data from Open IVR", data);
           const ivr = data.ivr;
           setIVR(data);
           handlePatient(data?.patient);
@@ -212,7 +210,7 @@ const CustomField = (props: CustomFieldProps) => {
 
           setProducts(() => {
             return productsList.find(
-              (item) => data?.product.___PRD === item.PRD
+              (item) => data?.product?.___PRD === item?.PRD
             );
           });
           setPrimaryMemberNumber(data?.patient?.Pay1MemberNumber);
@@ -346,7 +344,7 @@ const CustomField = (props: CustomFieldProps) => {
       null,
       null,
       (result) => {
-        console.log(result);
+  
       }
     );
 
@@ -416,10 +414,9 @@ const CustomField = (props: CustomFieldProps) => {
   };
 
   const handleDeleteDocument = async (document, index) => {
-    console.log("Logging Document", document);
+
   };
 // LOG Delete Later
-  console.log("Logging CPT Codes and wounds", cptWoundSize1, cptWoundSize2, cptCode, cptCode2)
 
   if (loading) {
     return (
@@ -480,6 +477,7 @@ const CustomField = (props: CustomFieldProps) => {
             <Typography variant="h6" gutterBottom>
               Insurance Verification Request
             </Typography>
+            
             <Select
               fullWidth
               value={practitioner}
@@ -490,7 +488,9 @@ const CustomField = (props: CustomFieldProps) => {
                   {practitioner.NameFull}
                 </MenuItem>
               ))}
+
             </Select>
+
             <TextField
               label="NPI"
               fullWidth
@@ -667,7 +667,7 @@ const CustomField = (props: CustomFieldProps) => {
                   variant="outlined"
                   value={cptWoundSize1}
                   onChange={(e) => setCPTWoundSize1(e.target.value)}
-                  sx={{ width: '120px' }}
+                  sx={{ width: '100px' }}
                 />
               </Grid>
               <Grid item>
@@ -694,12 +694,11 @@ const CustomField = (props: CustomFieldProps) => {
                   variant="outlined"
                   value={cptWoundSize2}
                   onChange={(e) => setCPTWoundSize2(e.target.value)}
-                  sx={{ width: '120px' }}
+                  sx={{ width: '100px' }}
                 />
               </Grid>
               <Grid item>
                 <Autocomplete
-                  
                   options={cptCodes}
                   getOptionLabel={(option) => option}
                   value={cptCode2}
