@@ -84,6 +84,7 @@ const CustomField = (props: CustomFieldProps) => {
   const [documentDialogOpen, setDocumentDialogOpen] = useState(false);
   const [comment, setComment] = useState("");
   const [reasons, setReasons] = useState("");
+  const [isDeleting, setDeleting] = useState(false);
 
   const handlePatient = useCallback((patientData, index = null) => {
     setPatient({ data: patientData, index: index });
@@ -344,7 +345,7 @@ const CustomField = (props: CustomFieldProps) => {
       null,
       null,
       (result) => {
-  
+        
       }
     );
 
@@ -414,6 +415,32 @@ const CustomField = (props: CustomFieldProps) => {
   };
 
   const handleDeleteDocument = async (document, index) => {
+    setDeleting(true)
+    await five.executeFunction(
+      "DeleteDocument",
+      //@ts-ignore
+      document,
+      null,
+      null,
+      null,
+      async (result) => {
+        await five.executeFunction(
+          "getIVRDetails",
+          selectedRecord.data,
+          null,
+          null,
+          null,
+          async (result) => {
+            const data = JSON.parse(result.serverResponse.results);
+            // Update documents state with fresh data
+            setDocuments(data.document);
+            setDeleting(false)
+          }
+        );
+      }
+    );
+    
+
 
   };
 // LOG Delete Later
@@ -748,13 +775,18 @@ const CustomField = (props: CustomFieldProps) => {
                         }}
                         onClick = {() => handleDeleteDocument(item, index)}
                       /> */}
+                      { isDeleting ? (<CircularProgress size={20} style={{marginLeft: "5px"}}/>) : 
                       <Typography
                         variant="body1"
                         color="#EC5750"
-                        onClick={() => handleDeleteDocument(item, index)}
+                        style={{zIndex:"99"}}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteDocument(item, index)}}
                       >
                         Delete
                       </Typography>
+}
                     </ListItemButton>
                   ))
                 }
@@ -791,6 +823,7 @@ const CustomField = (props: CustomFieldProps) => {
                 fullWidth
                 placeholder="Reasons"
                 margin="10"
+                disabled
               />
 
               <Typography variant="h6" mt={3} mb={3}>
@@ -805,6 +838,7 @@ const CustomField = (props: CustomFieldProps) => {
                 fullWidth
                 placeholder="Comments"
                 margin="10"
+                disabled
               />
             </Box>
             <Box
