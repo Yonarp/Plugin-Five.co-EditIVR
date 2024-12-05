@@ -1107,14 +1107,13 @@ const CustomField = (props: CustomFieldProps) => {
               )}
               <input
                 type="file"
-                multiple
                 accept="image/jpeg,image/png,application/pdf"
                 onChange={handleFileChange}
                 style={errors.selectedFiles ? { border: "1px solid red" } : {}}
               />
               {errors.selectedFiles && (
                 <Typography color="error">
-                  Please select at least one file to upload
+                  Please select a file to upload
                 </Typography>
               )}
             </DialogContent>
