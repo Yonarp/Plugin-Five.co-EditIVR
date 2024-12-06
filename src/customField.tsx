@@ -19,6 +19,7 @@ import {
   Menu,
   MenuItem,
   ListItemButton,
+  FormHelperText
 } from "@mui/material";
 
 import {
@@ -85,6 +86,7 @@ const CustomField = (props: CustomFieldProps) => {
   const [comment, setComment] = useState("");
   const [reasons, setReasons] = useState("");
   const [isDeleting, setDeleting] = useState(false);
+  const [dialogSelectedFiles, setDialogSelectedFiles] = useState([]);
 
   const handlePatient = useCallback((patientData, index = null) => {
     setPatient({ data: patientData, index: index });
@@ -98,12 +100,47 @@ const CustomField = (props: CustomFieldProps) => {
   const handleSecondDialogClose = () => {
     setSecondDialogOpen(false);
   };
+
+  // Error state
+  const [errors, setErrors] = useState({
+    documentName: false,
+    documentType: false,
+    otherDocumentType: false,
+    selectedFiles: false,
+  });
+
+  // Get file extension
+  const getFileExtension = (filename) => {
+    const parts = filename.split('.');
+    return parts[parts.length - 1];
+  };
+
   const handleDocumentDialogOpen = () => {
     setDocumentDialogOpen(true);
+    setDialogSelectedFiles([]);
+    setDocumentName("");
+    setDocumentType("");
+    setOtherDocumentType("");
+    setErrors({
+      documentName: false,
+      documentType: false,
+      otherDocumentType: false,
+      selectedFiles: false,
+    });
   };
 
   const handleDocumentDialogClose = () => {
     setDocumentDialogOpen(false);
+    setDialogSelectedFiles([]);
+    setDocumentName("");
+    setDocumentType("");
+    setOtherDocumentType("");
+    setErrors({
+      documentName: false,
+      documentType: false,
+      otherDocumentType: false,
+      selectedFiles: false,
+    });
   };
 
   const handleDocumentTypeChange = (event) => {
@@ -111,11 +148,50 @@ const CustomField = (props: CustomFieldProps) => {
     if (event.target.value !== "other") {
       setOtherDocumentType("");
     }
+    setErrors((prevErrors) => ({ ...prevErrors, documentType: false }));
   };
-
+  
   const handleFileChange = (event) => {
     const files = Array.from(event.target.files);
-    const promises = files.map((file) => {
+    setDialogSelectedFiles(files);
+    setErrors((prevErrors) => ({ ...prevErrors, selectedFiles: false }));
+  };
+
+  const handleDocumentDialogSubmit = () => {
+    let hasError = false;
+    const newErrors = {
+      documentName: false,
+      documentType: false,
+      otherDocumentType: false,
+      selectedFiles: false,
+    };
+
+    if (documentName.trim() === "") {
+      newErrors.documentName = true;
+      hasError = true;
+    }
+    
+    if (documentType.trim() === "") {
+      newErrors.documentType = true;
+      hasError = true;
+    }
+    
+    if (documentType === "other" && otherDocumentType.trim() === "") {
+      newErrors.otherDocumentType = true;
+      hasError = true;
+    }
+
+    if (dialogSelectedFiles.length === 0) {
+      newErrors.selectedFiles = true;
+      hasError = true;
+    }
+
+    if (hasError) {
+      setErrors(newErrors);
+      return;
+    }
+    
+    const promises = dialogSelectedFiles.map((file) => {
       return new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onloadend = () => {
@@ -126,9 +202,23 @@ const CustomField = (props: CustomFieldProps) => {
       });
     });
 
+    dialogSelectedFiles.forEach((file) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const fileType = file.type;
+        
+        setSelectedFilesBase64((prev) => [
+          ...prev,
+          { Base64: reader.result, ContentType: fileType },
+        ]);
+      };
+
+      reader.readAsDataURL(file);
+    });
+    
     Promise.all(promises)
       .then((base64Files) => {
-        setSelectedFiles((prev) => [...prev, ...files]);
+        setSelectedFiles((prev) => [...prev, ...dialogSelectedFiles]);
         setSelectedFilesBase64((prev) => [...prev, ...base64Files]);
         setDocumentTypes((prev) => [
           ...prev,
@@ -138,16 +228,15 @@ const CustomField = (props: CustomFieldProps) => {
 
         setDocuments((prev) => [
           ...prev,
-          ...files.map((file, index) => ({
+          ...dialogSelectedFiles.map((file, index) => ({
             Base64: base64Files[index],
             Category:
               documentType === "other" ? otherDocumentType : documentType,
-            Name: documentName,
+            Name: documentName + "." + getFileExtension(file.name)
           })),
         ]);
   
         handleDocumentDialogClose();
-     
 
         const documentObject = {
           Base64: base64Files[0],
@@ -164,7 +253,7 @@ const CustomField = (props: CustomFieldProps) => {
           null,
           null,
           (result) => {
-       
+      
           }
         );
       })
@@ -954,14 +1043,31 @@ const CustomField = (props: CustomFieldProps) => {
                 margin="normal"
                 label="Set Document Name"
                 value={documentName}
-                onChange={(e) => setDocumentName(e.target.value)}
+                required
+                error={errors.documentName}
+                helperText={
+                  errors.documentName ? "Document name is required" : ""
+                }
+                onChange={(e) => {
+                  setDocumentName(e.target.value);
+                  setErrors((prevErrors) => ({
+                    ...prevErrors,
+                    documentName: false,
+                  }));
+                }}
               />
-              <FormControl fullWidth margin="normal">
+              <FormControl fullWidth margin="normal" error={errors.documentType} required>
                 <InputLabel id="document-type-label">Document Type</InputLabel>
                 <Select
                   labelId="document-type-label"
                   value={documentType}
-                  onChange={handleDocumentTypeChange}
+                  onChange={(e) => {
+                    handleDocumentTypeChange(e);
+                    setErrors((prevErrors) => ({
+                      ...prevErrors,
+                      documentType: false,
+                    }));
+                  }}
                   label="Document Type"
                 >
                   <MenuItem value="facesheet">Facesheet</MenuItem>
@@ -972,6 +1078,9 @@ const CustomField = (props: CustomFieldProps) => {
                   </MenuItem>
                   <MenuItem value="other">Other</MenuItem>
                 </Select>
+                {errors.documentType && (
+                  <FormHelperText>Document type is required</FormHelperText>
+                )}
               </FormControl>
               {documentType === "other" && (
                 <TextField
@@ -979,19 +1088,40 @@ const CustomField = (props: CustomFieldProps) => {
                   margin="normal"
                   label="Specify Document Type"
                   value={otherDocumentType}
-                  onChange={(e) => setOtherDocumentType(e.target.value)}
+                  required
+                  error={errors.otherDocumentType}
+                  helperText={
+                    errors.otherDocumentType
+                      ? "Please specify document type"
+                      : ""
+                  }
+                  onChange={(e) => {
+                    setOtherDocumentType(e.target.value);
+                    setErrors((prevErrors) => ({
+                      ...prevErrors,
+                      otherDocumentType: false,
+                    }));
+                  }}
                 />
               )}
               <input
                 type="file"
-                multiple
                 accept="image/jpeg,image/png,application/pdf"
                 onChange={handleFileChange}
+                style={errors.selectedFiles ? { border: "1px solid red" } : {}}
               />
+              {errors.selectedFiles && (
+                <Typography color="error">
+                  Please select a file to upload
+                </Typography>
+              )}
             </DialogContent>
             <DialogActions>
               <Button onClick={handleDocumentDialogClose} color="primary">
                 Cancel
+              </Button>
+              <Button onClick={handleDocumentDialogSubmit} color="primary">
+                Upload
               </Button>
             </DialogActions>
           </Dialog>
