@@ -188,7 +188,6 @@ const CustomField = (props: CustomFieldProps) => {
 
     if (hasError) {
       setErrors(newErrors);
-      five.message("Please fill in all required fields.");
       return;
     }
     
