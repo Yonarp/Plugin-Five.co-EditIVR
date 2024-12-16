@@ -116,7 +116,6 @@ const CustomField = (props: CustomFieldProps) => {
   };
 
   const handleDocumentDialogOpen = () => {
-    setDocumentDialogOpen(true);
     setDialogSelectedFiles([]);
     setDocumentName("");
     setDocumentType("");
@@ -127,6 +126,12 @@ const CustomField = (props: CustomFieldProps) => {
       otherDocumentType: false,
       selectedFiles: false,
     });
+
+    if (documents.length >= 5) {
+      return five.message("Cannot upload more than " + documents.length.toString() + " files.");
+    }
+
+    setDocumentDialogOpen(true);
   };
 
   const handleDocumentDialogClose = () => {
