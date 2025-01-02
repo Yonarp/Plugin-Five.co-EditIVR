@@ -578,7 +578,7 @@ const CustomField = (props: CustomFieldProps) => {
           },
         }}
       >
-        <DialogTitle style={{ backgroundColor: "#225D7A", color: "white" }}>
+        <DialogTitle style={{ backgroundColor: "#15706A", color: "white" }}>
           IVR
         </DialogTitle>
         <DialogContent
@@ -896,7 +896,7 @@ const CustomField = (props: CustomFieldProps) => {
                 width: "150px",
                 height: "50px",
                 borderRadius: "0px",
-                background: "#285C79",
+                background: "#14706A",
                 color: "white",
                 marginRight: "20px",
               }}
@@ -955,7 +955,7 @@ const CustomField = (props: CustomFieldProps) => {
                   width: "100px",
                   height: "50px",
                   borderRadius: "0px",
-                  background: "#285C79",
+                  background: "#14706A",
                   color: "white",
                   marginRight: "20px",
                 }}
@@ -968,7 +968,7 @@ const CustomField = (props: CustomFieldProps) => {
                   width: "100px",
                   height: "50px",
                   borderRadius: "0px",
-                  background: "#285C79",
+                  background: "#14706A",
                   color: "white",
                   marginRight: "20px",
                 }}
@@ -981,7 +981,7 @@ const CustomField = (props: CustomFieldProps) => {
                   width: "100px",
                   height: "50px",
                   borderRadius: "0px",
-                  background: "#285C79",
+                  background: "#14706A",
                   color: "white",
                   marginRight: "20px",
                 }}
