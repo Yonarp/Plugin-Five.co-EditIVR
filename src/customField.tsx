@@ -896,8 +896,8 @@ const CustomField = (props: CustomFieldProps) => {
                 width: "150px",
                 height: "50px",
                 borderRadius: "0px",
-                background: "#14706A",
-                color: "white",
+                background: "#D8EEDA",
+                color: "#157069",
                 marginRight: "20px",
               }}
             >
