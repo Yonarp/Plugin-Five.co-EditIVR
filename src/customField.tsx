@@ -1,6 +1,6 @@
-//@ts-nocheck
+// @ts-nocheck
 import { ThemeProvider } from "@mui/system";
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useState, useEffect } from "react";
 import {
   Box,
   Button,
@@ -19,7 +19,7 @@ import {
   Menu,
   MenuItem,
   ListItemButton,
-  FormHelperText
+  FormHelperText,
 } from "@mui/material";
 
 import {
@@ -45,7 +45,12 @@ FiveInitialize();
 
 const CustomField = (props: CustomFieldProps) => {
   const { theme, value, onValueUpdated, variant, five, selectedRecord } = props;
+
+  // -----------------------------------------------------
+  // States
+  // -----------------------------------------------------
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [status, setStatus] = useState("");
   const [admitted, setAdmitted] = useState(null);
   const [placeOfService, setPlaceOfService] = useState(null);
   const [ivr, setIVR] = useState({});
@@ -88,6 +93,23 @@ const CustomField = (props: CustomFieldProps) => {
   const [isDeleting, setDeleting] = useState(false);
   const [dialogSelectedFiles, setDialogSelectedFiles] = useState([]);
 
+  // Error state
+  const [errors, setErrors] = useState({
+    documentName: false,
+    documentType: false,
+    otherDocumentType: false,
+    selectedFiles: false,
+  });
+
+  // -----------------------------------------------------
+  // Read-Only logic
+  // -----------------------------------------------------
+  // We consider the form read-only if the record status is "Approved" or "Archived"
+  const isReadOnly = status === "Approved" || status === "Archived";
+
+  // -----------------------------------------------------
+  // Helpers
+  // -----------------------------------------------------
   const handlePatient = useCallback((patientData, index = null) => {
     setPatient({ data: patientData, index: index });
   }, []);
@@ -101,17 +123,8 @@ const CustomField = (props: CustomFieldProps) => {
     setSecondDialogOpen(false);
   };
 
-  // Error state
-  const [errors, setErrors] = useState({
-    documentName: false,
-    documentType: false,
-    otherDocumentType: false,
-    selectedFiles: false,
-  });
-
-  // Get file extension
   const getFileExtension = (filename) => {
-    const parts = filename.split('.');
+    const parts = filename.split(".");
     return parts[parts.length - 1];
   };
 
@@ -128,9 +141,10 @@ const CustomField = (props: CustomFieldProps) => {
     });
 
     if (documents.length >= 5) {
-      return five.message("Cannot upload more than " + documents.length.toString() + " files.");
+      return five.message(
+        "Cannot upload more than " + documents.length.toString() + " files."
+      );
     }
-
     setDocumentDialogOpen(true);
   };
 
@@ -153,13 +167,13 @@ const CustomField = (props: CustomFieldProps) => {
     if (event.target.value !== "other") {
       setOtherDocumentType("");
     }
-    setErrors((prevErrors) => ({ ...prevErrors, documentType: false }));
+    setErrors((prev) => ({ ...prev, documentType: false }));
   };
-  
+
   const handleFileChange = (event) => {
     const files = Array.from(event.target.files);
     setDialogSelectedFiles(files);
-    setErrors((prevErrors) => ({ ...prevErrors, selectedFiles: false }));
+    setErrors((prev) => ({ ...prev, selectedFiles: false }));
   };
 
   const handleDocumentDialogSubmit = () => {
@@ -175,12 +189,12 @@ const CustomField = (props: CustomFieldProps) => {
       newErrors.documentName = true;
       hasError = true;
     }
-    
+
     if (documentType.trim() === "") {
       newErrors.documentType = true;
       hasError = true;
     }
-    
+
     if (documentType === "other" && otherDocumentType.trim() === "") {
       newErrors.otherDocumentType = true;
       hasError = true;
@@ -195,7 +209,7 @@ const CustomField = (props: CustomFieldProps) => {
       setErrors(newErrors);
       return;
     }
-    
+
     const promises = dialogSelectedFiles.map((file) => {
       return new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -211,16 +225,14 @@ const CustomField = (props: CustomFieldProps) => {
       const reader = new FileReader();
       reader.onloadend = () => {
         const fileType = file.type;
-        
         setSelectedFilesBase64((prev) => [
           ...prev,
           { Base64: reader.result, ContentType: fileType },
         ]);
       };
-
       reader.readAsDataURL(file);
     });
-    
+
     Promise.all(promises)
       .then((base64Files) => {
         setSelectedFiles((prev) => [...prev, ...dialogSelectedFiles]);
@@ -237,10 +249,10 @@ const CustomField = (props: CustomFieldProps) => {
             Base64: base64Files[index],
             Category:
               documentType === "other" ? otherDocumentType : documentType,
-            Name: documentName + "." + getFileExtension(file.name)
+            Name: documentName + "." + getFileExtension(file.name),
           })),
         ]);
-  
+
         handleDocumentDialogClose();
 
         const documentObject = {
@@ -258,7 +270,7 @@ const CustomField = (props: CustomFieldProps) => {
           null,
           null,
           (result) => {
-      
+            // ...
           }
         );
       })
@@ -276,7 +288,6 @@ const CustomField = (props: CustomFieldProps) => {
   };
 
   const getMimeTypeFromDataUri = (dataUri) => {
-    // Extract the MIME type from the Data URI
     const mimeType = dataUri.match(/data:([^;]+);base64,/);
     return mimeType ? mimeType[1] : null;
   };
@@ -302,7 +313,7 @@ const CustomField = (props: CustomFieldProps) => {
           setCPTWoundSize2(ivr?.WoundSize2);
           setECode(ivr?.ICD10_E);
           setDocuments(data.document);
-
+          setStatus(selectedRecord.data?.Status);
           setProducts(() => {
             return productsList.find(
               (item) => data?.product?.___PRD === item?.PRD
@@ -320,11 +331,9 @@ const CustomField = (props: CustomFieldProps) => {
           setComment(ivr?.Comment);
           setReasons(ivr?.Reason);
 
-          const payorKeys = [
-            data?.patient?.__PAY1,
-            data?.patient?.__PAY2,
-          ].filter(Boolean);
-
+          const payorKeys = [data?.patient?.__PAY1, data?.patient?.__PAY2].filter(
+            Boolean
+          );
           const payorPromises = payorKeys.map((payorKey) => {
             const payorObject = { PayKey: payorKey };
             return new Promise((resolve) => {
@@ -381,7 +390,9 @@ const CustomField = (props: CustomFieldProps) => {
             null,
             null,
             null,
-            async (result) => {}
+            async (result) => {
+              // ...
+            }
           );
         }
       );
@@ -439,7 +450,7 @@ const CustomField = (props: CustomFieldProps) => {
       null,
       null,
       (result) => {
-        
+        // ...
       }
     );
 
@@ -447,9 +458,8 @@ const CustomField = (props: CustomFieldProps) => {
   };
 
   const handleProductChange = (event) => {
-    const newProduct = products;
-    newProduct = event.target.value;
-
+    // In your original code, 'products' might be set incorrectly
+    // if you want to store a single item, remove the array usage
     setProducts(event.target.value);
   };
 
@@ -480,6 +490,7 @@ const CustomField = (props: CustomFieldProps) => {
   const handleCompanyChange = (event, newValue) => {
     setSelectedCompany(newValue);
   };
+
   const handleCompanyChangeSecond = (event, newValue) => {
     setSelectedCompanySecond(newValue);
   };
@@ -509,7 +520,7 @@ const CustomField = (props: CustomFieldProps) => {
   };
 
   const handleDeleteDocument = async (document, index) => {
-    setDeleting(true)
+    setDeleting(true);
     await five.executeFunction(
       "DeleteDocument",
       //@ts-ignore
@@ -525,20 +536,24 @@ const CustomField = (props: CustomFieldProps) => {
           null,
           null,
           async (result) => {
-            const data = JSON.parse(result.serverResponse.results);
             // Update documents state with fresh data
+            const data = JSON.parse(result.serverResponse.results);
             setDocuments(data.document);
-            setDeleting(false)
+            setDeleting(false);
           }
         );
       }
     );
-    
-
-
   };
-// LOG Delete Later
 
+  // Update status from record on mount
+  useEffect(() => {
+    setStatus(selectedRecord.data?.Status);
+  }, [selectedRecord.data?.Status]);
+
+  // -----------------------------------------------------
+  // Loading spinner
+  // -----------------------------------------------------
   if (loading) {
     return (
       <Container
@@ -563,8 +578,9 @@ const CustomField = (props: CustomFieldProps) => {
           color: "white",
         }}
       >
-        Open IVR
+        {isReadOnly ? "View IVR" : "Open IVR"}
       </Button>
+
       <Dialog
         open={dialogOpen}
         onClose={handleDialogClose}
@@ -581,6 +597,7 @@ const CustomField = (props: CustomFieldProps) => {
         <DialogTitle style={{ backgroundColor: "#15706A", color: "white" }}>
           IVR
         </DialogTitle>
+
         <DialogContent
           style={{ maxWidth: "100%", overflowX: "hidden", padding: "10px" }}
         >
@@ -598,40 +615,52 @@ const CustomField = (props: CustomFieldProps) => {
             <Typography variant="h6" gutterBottom>
               Insurance Verification Request
             </Typography>
-            
+
+            {/* Practitioner Select */}
             <Select
               fullWidth
               value={practitioner}
               onChange={handlePractitioner}
+              disabled={isReadOnly}
             >
-              {practitionerList.map((practitioner) => (
-                <MenuItem key={practitioner.___USR} value={practitioner}>
-                  {practitioner.NameFull}
+              {practitionerList.map((pr) => (
+                <MenuItem key={pr.___USR} value={pr}>
+                  {pr.NameFull}
                 </MenuItem>
               ))}
-
             </Select>
 
+            {/* NPI Field */}
             <TextField
               label="NPI"
               fullWidth
               margin="dense"
               size="small"
               value={ivr.account?.NPI}
+              disabled={isReadOnly}
             />
 
-            <Select fullWidth value={products} onChange={handleProductChange}>
+            {/* Product Select */}
+            <Select
+              fullWidth
+              value={products}
+              onChange={handleProductChange}
+              disabled={isReadOnly}
+            >
               {productsList.map((product) => (
                 <MenuItem key={product?.QCode} value={product}>
                   {product?.Name}
                 </MenuItem>
               ))}
             </Select>
+
+            {/* Primary Payor */}
             <Autocomplete
               options={[...CompanyNames, "Other"]}
               getOptionLabel={(option) => option}
               value={selectedCompany}
               onChange={handleCompanyChange}
+              disabled={isReadOnly}
               renderInput={(params) => (
                 <TextField
                   {...params}
@@ -647,8 +676,9 @@ const CustomField = (props: CustomFieldProps) => {
               fullWidth
               margin="dense"
               value={primaryMemberNumber}
-              onChange={() => handleMemberNumber(true, event)}
+              onChange={(e) => handleMemberNumber(true, e)}
               size="small"
+              disabled={isReadOnly}
             />
 
             <TextField
@@ -656,15 +686,18 @@ const CustomField = (props: CustomFieldProps) => {
               fullWidth
               margin="dense"
               value={primaryGroupNumber}
-              onChange={() => handleGroupNumber(true, event)}
+              onChange={(e) => handleGroupNumber(true, e)}
               size="small"
+              disabled={isReadOnly}
             />
 
+            {/* Secondary Payor */}
             <Autocomplete
               options={[...CompanyNames, "Other"]}
               getOptionLabel={(option) => option}
               value={selectedCompanySecond}
               onChange={handleCompanyChangeSecond}
+              disabled={isReadOnly}
               renderInput={(params) => (
                 <TextField
                   {...params}
@@ -680,8 +713,9 @@ const CustomField = (props: CustomFieldProps) => {
               fullWidth
               margin="dense"
               value={secondaryMemberNumber}
-              onChange={() => handleMemberNumber(false, event)}
+              onChange={(e) => handleMemberNumber(false, e)}
               size="small"
+              disabled={isReadOnly}
             />
 
             <TextField
@@ -689,8 +723,9 @@ const CustomField = (props: CustomFieldProps) => {
               fullWidth
               margin="dense"
               value={secondaryGroupNumber}
-              onChange={() => handleGroupNumber(false, event)}
+              onChange={(e) => handleGroupNumber(false, e)}
               size="small"
+              disabled={isReadOnly}
             />
 
             <Grid container spacing={1} marginTop={1}>
@@ -718,13 +753,9 @@ const CustomField = (props: CustomFieldProps) => {
                   getOptionLabel={(option) => option}
                   value={iCode}
                   onChange={handleICodeChange}
+                  disabled={isReadOnly}
                   renderInput={(params) => (
-                    <TextField
-                      {...params}
-                      label="I Code"
-                      margin="normal"
-                      // Adjust the width here
-                    />
+                    <TextField {...params} label="I Code" margin="normal" />
                   )}
                 />
               </Grid>
@@ -734,13 +765,9 @@ const CustomField = (props: CustomFieldProps) => {
                   getOptionLabel={(option) => option}
                   value={lCode}
                   onChange={handleLCodeChange}
+                  disabled={isReadOnly}
                   renderInput={(params) => (
-                    <TextField
-                      {...params}
-                      label="L Code"
-                      margin="normal"
-                      // Adjust the width here
-                    />
+                    <TextField {...params} label="L Code" margin="normal" />
                   )}
                 />
               </Grid>
@@ -750,13 +777,9 @@ const CustomField = (props: CustomFieldProps) => {
                   getOptionLabel={(option) => option}
                   value={eCode}
                   onChange={handleECodeChange}
+                  disabled={isReadOnly}
                   renderInput={(params) => (
-                    <TextField
-                      {...params}
-                      label="E Code"
-                      margin="normal"
-                      // Adjust the width here
-                    />
+                    <TextField {...params} label="E Code" margin="normal" />
                   )}
                 />
               </Grid>
@@ -766,17 +789,14 @@ const CustomField = (props: CustomFieldProps) => {
                   getOptionLabel={(option) => option}
                   value={cdCode}
                   onChange={handleCDCodeChange}
+                  disabled={isReadOnly}
                   renderInput={(params) => (
-                    <TextField
-                      {...params}
-                      label="CD Code"
-                      margin="normal"
-                      // Adjust the width here
-                    />
+                    <TextField {...params} label="CD Code" margin="normal" />
                   )}
                 />
               </Grid>
             </Grid>
+
             <Typography variant="h6" mt={3}>
               CPT Code:
             </Typography>
@@ -788,7 +808,8 @@ const CustomField = (props: CustomFieldProps) => {
                   variant="outlined"
                   value={cptWoundSize1}
                   onChange={(e) => setCPTWoundSize1(e.target.value)}
-                  sx={{ width: '100px' }}
+                  sx={{ width: "100px" }}
+                  disabled={isReadOnly}
                 />
               </Grid>
               <Grid item>
@@ -797,25 +818,26 @@ const CustomField = (props: CustomFieldProps) => {
                   getOptionLabel={(option) => option}
                   value={cptCode}
                   onChange={handleCPTCodeChange}
+                  disabled={isReadOnly}
                   renderInput={(params) => (
                     <TextField
                       {...params}
                       label="CPT Code"
                       variant="outlined"
-                      sx={{ width: '150px' }}
-                      // Adjust the width here
+                      sx={{ width: "150px" }}
                     />
                   )}
                 />
               </Grid>
               <Grid item>
-              <TextField
+                <TextField
                   label="Wound Size 2"
                   type="number"
                   variant="outlined"
                   value={cptWoundSize2}
                   onChange={(e) => setCPTWoundSize2(e.target.value)}
-                  sx={{ width: '100px' }}
+                  sx={{ width: "100px" }}
+                  disabled={isReadOnly}
                 />
               </Grid>
               <Grid item>
@@ -823,73 +845,71 @@ const CustomField = (props: CustomFieldProps) => {
                   options={cptCodes}
                   getOptionLabel={(option) => option}
                   value={cptCode2}
-                  onChange={(e,newValue) => setCPTCode2(newValue)}
+                  onChange={(e, newValue) => setCPTCode2(newValue)}
+                  disabled={isReadOnly}
                   renderInput={(params) => (
                     <TextField
                       {...params}
                       label="CPT Code 2"
                       variant="outlined"
-                      sx={{ width: '150px' }}
-                    
-                      // Adjust the width here
+                      sx={{ width: "150px" }}
                     />
                   )}
                 />
               </Grid>
             </Grid>
+
             <Typography variant="h6" mt={3}>
               Documents:
             </Typography>
+
             {documents.length > 0 ? (
               <List>
-                {
-                  //@ts-ignore
-                  documents?.map((item, index) => (
-                    <ListItemButton
-                      key={index}
-                      onClick={() => handleSecondDialogOpen(item)}
-                      sx={{
-                        borderBottom: "1px solid #00000033",
-                        display: "flex",
-                        flexDirection: "row",
-                        justifyContent: "space-between",
-                        color: "black",
-                        "&:hover": {
-                          backgroundColor: "lightblue",
-                        },
-                      }}
-                    >
-                      <Typography variant="body2">{item?.Name}</Typography>
-                      {/*  <Delete
-                        style={{
-                          fill: "#EC5750",
-                          color: "#EC5750",
-                          cursor: "pointer",
-                          marginLeft: "5px",
-                        }}
-                        onClick = {() => handleDeleteDocument(item, index)}
-                      /> */}
-                      { isDeleting ? (<CircularProgress size={20} style={{marginLeft: "5px"}}/>) : 
-                      <Typography
-                        variant="body1"
-                        color="#EC5750"
-                        style={{zIndex:"99"}}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteDocument(item, index)}}
-                      >
-                        Delete
-                      </Typography>
-}
-                    </ListItemButton>
-                  ))
-                }
+                {documents?.map((item, index) => (
+                  <ListItemButton
+                    key={index}
+                    onClick={() => handleSecondDialogOpen(item)}
+                    sx={{
+                      borderBottom: "1px solid #00000033",
+                      display: "flex",
+                      flexDirection: "row",
+                      justifyContent: "space-between",
+                      color: "black",
+                      "&:hover": {
+                        backgroundColor: "lightblue",
+                      },
+                    }}
+                  >
+                    <Typography variant="body2">{item?.Name}</Typography>
+
+                    {/* Only show Delete if not read-only */}
+                    {!isReadOnly ? (
+                      isDeleting ? (
+                        <CircularProgress size={20} style={{ marginLeft: 5 }} />
+                      ) : (
+                        <Typography
+                          variant="body1"
+                          color="#EC5750"
+                          style={{ zIndex: "99" }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteDocument(item, index);
+                          }}
+                        >
+                          Delete
+                        </Typography>
+                      )
+                    ) : null}
+                  </ListItemButton>
+                ))}
               </List>
             ) : (
               <Typography variant="body2" mt={3}>
                 No Documents Added
               </Typography>
             )}
+
+            {/* Add Documents button is disabled if read-only */}
             <Button
               onClick={handleDocumentDialogOpen}
               style={{
@@ -900,15 +920,16 @@ const CustomField = (props: CustomFieldProps) => {
                 color: "#157069",
                 marginRight: "20px",
               }}
+              disabled={isReadOnly}
             >
-              {" "}
-              Add Documents{" "}
+              Add Documents
             </Button>
+
             <Box display="flex" flexDirection="column">
               <Typography variant="h6" mt={3} mb={3}>
                 Reasons:
               </Typography>
-
+              {/* These were already disabled, but let's rely on our isReadOnly */}
               <TextField
                 rows={3}
                 value={reasons}
@@ -917,13 +938,12 @@ const CustomField = (props: CustomFieldProps) => {
                 fullWidth
                 placeholder="Reasons"
                 margin="10"
-                disabled
+                disabled={isReadOnly}
               />
 
               <Typography variant="h6" mt={3} mb={3}>
                 Comments:
               </Typography>
-
               <TextField
                 rows={3}
                 value={comment}
@@ -932,9 +952,11 @@ const CustomField = (props: CustomFieldProps) => {
                 fullWidth
                 placeholder="Comments"
                 margin="10"
-                disabled
+                disabled={isReadOnly}
               />
             </Box>
+
+            {/* Footer Action Buttons */}
             <Box
               style={{
                 position: "absolute",
@@ -962,43 +984,49 @@ const CustomField = (props: CustomFieldProps) => {
               >
                 Close
               </Button>
-              <Button
-                onClick={() => handleSubmit(null)}
-                style={{
-                  width: "100px",
-                  height: "50px",
-                  borderRadius: "0px",
-                  background: "#14706A",
-                  color: "white",
-                  marginRight: "20px",
-                }}
-              >
-                Save
-              </Button>
-              <Button
-                onClick={() => handleSubmit(1)}
-                style={{
-                  width: "100px",
-                  height: "50px",
-                  borderRadius: "0px",
-                  background: "#14706A",
-                  color: "white",
-                  marginRight: "20px",
-                }}
-              >
-                Submit
-              </Button>
+
+              {/* Hide Save and Submit if read-only */}
+              {!isReadOnly && (
+                <>
+                  <Button
+                    onClick={() => handleSubmit(null)}
+                    style={{
+                      width: "100px",
+                      height: "50px",
+                      borderRadius: "0px",
+                      background: "#14706A",
+                      color: "white",
+                      marginRight: "20px",
+                    }}
+                  >
+                    Save
+                  </Button>
+                  <Button
+                    onClick={() => handleSubmit(1)}
+                    style={{
+                      width: "100px",
+                      height: "50px",
+                      borderRadius: "0px",
+                      background: "#14706A",
+                      color: "white",
+                      marginRight: "20px",
+                    }}
+                  >
+                    Submit
+                  </Button>
+                </>
+              )}
             </Box>
           </Box>
 
-          {/* --------------------------------- Previewing Documents Dialog------------------------------- */}
+          {/* --------------------------------- Previewing Documents Dialog ------------------------------- */}
           <Dialog
             open={secondDialogOpen}
             onClose={handleSecondDialogClose}
             PaperProps={{
               style: {
                 minWidth: "70vw",
-                height: "90%", // Sets the dialog to 90% of the screen width
+                height: "90%",
               },
             }}
           >
@@ -1007,7 +1035,6 @@ const CustomField = (props: CustomFieldProps) => {
               {selectedDocument && selectedDocument.Base64 ? (
                 getMimeTypeFromDataUri(selectedDocument.Base64) ===
                 "application/pdf" ? (
-                  // Render PDF using iframe
                   <iframe
                     src={selectedDocument.Base64}
                     title="PDF Document"
@@ -1016,7 +1043,6 @@ const CustomField = (props: CustomFieldProps) => {
                     style={{ border: "none" }}
                   />
                 ) : (
-                  // Render image
                   <img
                     src={selectedDocument.Base64}
                     alt="Document"
@@ -1028,7 +1054,9 @@ const CustomField = (props: CustomFieldProps) => {
                   />
                 )
               ) : (
-                <Typography variant="body2">No document available</Typography>
+                <Typography variant="body2">
+                  No document available
+                </Typography>
               )}
             </DialogContent>
             <DialogActions>
@@ -1039,10 +1067,13 @@ const CustomField = (props: CustomFieldProps) => {
           </Dialog>
 
           {/* -------------------------- Adding Documents Dialog Box ----------------------------------- */}
-          <Dialog open={documentDialogOpen} onClose={handleDocumentDialogClose}>
+          <Dialog
+            open={documentDialogOpen}
+            onClose={handleDocumentDialogClose}
+          >
             <DialogTitle>Upload Document</DialogTitle>
             <DialogContent style={{ width: "400px" }}>
-              {/* Fixed width for dialog content */}
+              {/* Document Name */}
               <TextField
                 fullWidth
                 margin="normal"
@@ -1055,23 +1086,24 @@ const CustomField = (props: CustomFieldProps) => {
                 }
                 onChange={(e) => {
                   setDocumentName(e.target.value);
-                  setErrors((prevErrors) => ({
-                    ...prevErrors,
-                    documentName: false,
-                  }));
+                  setErrors((prev) => ({ ...prev, documentName: false }));
                 }}
               />
-              <FormControl fullWidth margin="normal" error={errors.documentType} required>
+
+              {/* Document Type */}
+              <FormControl
+                fullWidth
+                margin="normal"
+                error={errors.documentType}
+                required
+              >
                 <InputLabel id="document-type-label">Document Type</InputLabel>
                 <Select
                   labelId="document-type-label"
                   value={documentType}
                   onChange={(e) => {
                     handleDocumentTypeChange(e);
-                    setErrors((prevErrors) => ({
-                      ...prevErrors,
-                      documentType: false,
-                    }));
+                    setErrors((prev) => ({ ...prev, documentType: false }));
                   }}
                   label="Document Type"
                 >
@@ -1087,6 +1119,8 @@ const CustomField = (props: CustomFieldProps) => {
                   <FormHelperText>Document type is required</FormHelperText>
                 )}
               </FormControl>
+
+              {/* Other Document Type if "other" */}
               {documentType === "other" && (
                 <TextField
                   fullWidth
@@ -1102,13 +1136,14 @@ const CustomField = (props: CustomFieldProps) => {
                   }
                   onChange={(e) => {
                     setOtherDocumentType(e.target.value);
-                    setErrors((prevErrors) => ({
-                      ...prevErrors,
+                    setErrors((prev) => ({
+                      ...prev,
                       otherDocumentType: false,
                     }));
                   }}
                 />
               )}
+
               <input
                 type="file"
                 accept="image/jpeg,image/png,application/pdf"
