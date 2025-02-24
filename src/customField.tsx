@@ -1,6 +1,6 @@
 // @ts-nocheck
 import { ThemeProvider } from "@mui/system";
-import React, { useCallback, useState, useEffect } from "react";
+import React, { useCallback, useState, useEffect, useMemo } from "react";
 import {
   Box,
   Button,
@@ -10,13 +10,10 @@ import {
   TextField,
   Typography,
   Grid,
-  FormControlLabel,
-  Checkbox,
   Container,
   Autocomplete,
   CircularProgress,
   Select,
-  Menu,
   MenuItem,
   ListItemButton,
   FormHelperText,
@@ -55,17 +52,17 @@ const CustomField = (props: CustomFieldProps) => {
   const [placeOfService, setPlaceOfService] = useState(null);
   const [ivr, setIVR] = useState({});
   const [payors, setPayors] = useState([]);
-  const [products, setProducts] = useState([]);
+  const [products, setProducts] = useState(null); // store a single product
   const [practitioner, setPractitioner] = useState(null);
   const [practitionerList, setPractitionerList] = useState([]);
-  const [iCode, setICode] = useState(null);
-  const [lCode, setLCode] = useState(null);
-  const [eCode, setECode] = useState(null);
-  const [cdCode, setCDCode] = useState(null);
-  const [cptWoundSize1, setCPTWoundSize1] = useState(null);
-  const [cptWoundSize2, setCPTWoundSize2] = useState(null);
-  const [cptCode, setCPTCode] = useState(null);
-  const [cptCode2, setCPTCode2] = useState(null);
+  const [iCode, setICode] = useState("");
+  const [lCode, setLCode] = useState("");
+  const [eCode, setECode] = useState("");
+  const [cdCode, setCDCode] = useState("");
+  const [cptWoundSize1, setCPTWoundSize1] = useState("");
+  const [cptWoundSize2, setCPTWoundSize2] = useState("");
+  const [cptCode, setCPTCode] = useState("");
+  const [cptCode2, setCPTCode2] = useState("");
   const [patient, setPatient] = useState(null);
   const [loading, setLoading] = useState(false);
   const [isChecked, setIsChecked] = useState(false);
@@ -75,7 +72,7 @@ const CustomField = (props: CustomFieldProps) => {
   const [primaryMemberNumber, setPrimaryMemberNumber] = useState("");
   const [secondaryMemberNumber, setSecondaryMemberNumber] = useState("");
   const [primaryGroupNumber, setPrimaryGroupNumber] = useState("");
-  const [secondaryGroupNumber, setSecondaryGroupNumber] = useState();
+  const [secondaryGroupNumber, setSecondaryGroupNumber] = useState("");
   const [documents, setDocuments] = useState([]);
   const [secondDialogOpen, setSecondDialogOpen] = useState(false);
   const [selectedDocument, setSelectedDocument] = useState(null);
@@ -93,7 +90,7 @@ const CustomField = (props: CustomFieldProps) => {
   const [isDeleting, setDeleting] = useState(false);
   const [dialogSelectedFiles, setDialogSelectedFiles] = useState([]);
 
-  // Error state
+  // Error state for document uploads
   const [errors, setErrors] = useState({
     documentName: false,
     documentType: false,
@@ -104,7 +101,6 @@ const CustomField = (props: CustomFieldProps) => {
   // -----------------------------------------------------
   // Read-Only logic
   // -----------------------------------------------------
-  // We consider the form read-only if the record status is "Approved" or "Archived"
   const isReadOnly = status === "Approved" || status === "Archived";
 
   // -----------------------------------------------------
@@ -279,14 +275,6 @@ const CustomField = (props: CustomFieldProps) => {
       });
   };
 
-  const getDataUri = (base64) => {
-    if (base64.startsWith("data:image/")) {
-      return base64;
-    } else {
-      return `data:image/jpeg;base64,${base64}`;
-    }
-  };
-
   const getMimeTypeFromDataUri = (dataUri) => {
     const mimeType = dataUri.match(/data:([^;]+);base64,/);
     return mimeType ? mimeType[1] : null;
@@ -294,6 +282,7 @@ const CustomField = (props: CustomFieldProps) => {
 
   const handleButtonClick = () => {
     const fetchData = async () => {
+      setLoading(true);
       await five.executeFunction(
         "getIVRDetails",
         selectedRecord.data,
@@ -302,34 +291,36 @@ const CustomField = (props: CustomFieldProps) => {
         null,
         async (result) => {
           const data = JSON.parse(result.serverResponse.results);
-          const ivr = data.ivr;
+          const ivrData = data.ivr;
           setIVR(data);
           handlePatient(data?.patient);
-          setLCode(ivr?.ICD10_L);
-          setICode(ivr?.ICD10_I);
-          setCPTCode(ivr?.CPTCODE);
-          setCPTCode2(ivr?.CPTCODE2);
-          setCPTWoundSize1(ivr?.WoundSize);
-          setCPTWoundSize2(ivr?.WoundSize2);
-          setECode(ivr?.ICD10_E);
+          setLCode(ivrData?.ICD10_L || "");
+          setICode(ivrData?.ICD10_I || "");
+          setCPTCode(ivrData?.CPTCODE || "");
+          setCPTCode2(ivrData?.CPTCODE2 || "");
+          setCPTWoundSize1(ivrData?.WoundSize || "");
+          setCPTWoundSize2(ivrData?.WoundSize2 || "");
+          setECode(ivrData?.ICD10_E || "");
           setDocuments(data.document);
           setStatus(selectedRecord.data?.Status);
-          setProducts(() => {
-            return productsList.find(
-              (item) => data?.product?.___PRD === item?.PRD
-            );
-          });
-          setPrimaryMemberNumber(data?.patient?.Pay1MemberNumber);
-          setSecondaryMemberNumber(data?.patient?.Pay2MemberNumber);
-          setPrimaryGroupNumber(data?.patient?.Pay1Group);
-          setSecondaryGroupNumber(data?.patient?.Pay2Group);
-          setCDCode(ivr?.ICD10_CD);
+
+          // If there's a saved product in DB, find it in productsList
+          const matchedProduct = productsList.find(
+            (item) => data?.product?.___PRD === item?.PRD
+          );
+          setProducts(matchedProduct || null);
+
+          setPrimaryMemberNumber(data?.patient?.Pay1MemberNumber || "");
+          setSecondaryMemberNumber(data?.patient?.Pay2MemberNumber || "");
+          setPrimaryGroupNumber(data?.patient?.Pay1Group || "");
+          setSecondaryGroupNumber(data?.patient?.Pay2Group || "");
+          setCDCode(ivrData?.ICD10_CD || "");
           setPractitioner(data?.practitioner);
-          setCPTWound(ivr?.WoundType);
-          setAdmitted(ivr?.SNFAttendance ? ivr?.SNFAttendance : false);
-          setPlaceOfService(ivr?.PlaceofService);
-          setComment(ivr?.Comment);
-          setReasons(ivr?.Reason);
+          setCPTWound(ivrData?.WoundType);
+          setAdmitted(ivrData?.SNFAttendance ? ivrData?.SNFAttendance : false);
+          setPlaceOfService(ivrData?.PlaceofService);
+          setComment(ivrData?.Comment);
+          setReasons(ivrData?.Reason);
 
           const payorKeys = [data?.patient?.__PAY1, data?.patient?.__PAY2].filter(
             Boolean
@@ -353,8 +344,11 @@ const CustomField = (props: CustomFieldProps) => {
 
           const payorArray = await Promise.all(payorPromises);
           setPayors(payorArray);
-          setSelectedCompany(payorArray[0]?.CompanyName);
-          setSelectedCompanySecond(payorArray[1]?.CompanyName);
+          setSelectedCompany(payorArray[0]?.CompanyName || "");
+          setSelectedCompanySecond(payorArray[1]?.CompanyName || "");
+
+          // If you want NPI to be editable, store it in state
+          setNPI(data?.account?.NPI || "");
 
           await five.executeFunction(
             "getAccountPractitioners",
@@ -366,20 +360,23 @@ const CustomField = (props: CustomFieldProps) => {
             null,
             (result) => {
               const accountData = JSON.parse(result.serverResponse.results);
-              setPractitionerList(
-                accountData.filter((item) => item?.Title === "Practitioner")
+              const onlyPractitioners = accountData.filter(
+                (item) => item?.Title === "Practitioner"
               );
-              setPractitioner(
-                accountData.find(
-                  (item) => item?.___USR === data?.practitioner.___USR
-                )
+              setPractitionerList(onlyPractitioners);
+
+              // If there's an existing practitioner from the server, set it properly
+              const matchedPractitioner = onlyPractitioners.find(
+                (item) => item?.___USR === data?.practitioner?.___USR
               );
+              setPractitioner(matchedPractitioner || null);
               setLoading(false);
             }
           );
 
+          // Log something
           const logObject = {
-            ivr: ivr,
+            ivr: ivrData,
             ORD: "",
             type: "IVR",
           };
@@ -398,7 +395,6 @@ const CustomField = (props: CustomFieldProps) => {
       );
     };
 
-    setLoading(true);
     fetchData();
     setDialogOpen(true);
   };
@@ -416,7 +412,7 @@ const CustomField = (props: CustomFieldProps) => {
       link: selectedRecord.data.editLink,
       patient: patient.data,
       products,
-      practitionerKey: practitioner.___USR,
+      practitionerKey: practitioner?.___USR,
       eCode,
       admitted,
       placeOfService,
@@ -439,7 +435,7 @@ const CustomField = (props: CustomFieldProps) => {
       cptCode2,
       reasons,
       comment,
-      IVRKey: ivr.ivr.___IVR,
+      IVRKey: ivr.ivr?.___IVR,
     };
 
     await five.executeFunction(
@@ -458,8 +454,6 @@ const CustomField = (props: CustomFieldProps) => {
   };
 
   const handleProductChange = (event) => {
-    // In your original code, 'products' might be set incorrectly
-    // if you want to store a single item, remove the array usage
     setProducts(event.target.value);
   };
 
@@ -552,7 +546,77 @@ const CustomField = (props: CustomFieldProps) => {
   }, [selectedRecord.data?.Status]);
 
   // -----------------------------------------------------
-  // Loading spinner
+  // VALIDATION FUNCTIONS
+  // -----------------------------------------------------
+  const isValidRequiredValue = (val) => {
+    if (!val) return false;
+    const strVal = String(val).trim().toLowerCase();
+    if (!strVal || strVal === "null") return false;
+    return true;
+  };
+
+  const isPositiveNumber = (val) => {
+    if (!val) return false;
+    const num = parseFloat(val);
+    if (Number.isNaN(num)) return false;
+    return num > 0;
+  };
+
+  // -----------------------------------------------------
+  // Required Fields Validation (useMemo)
+  // -----------------------------------------------------
+  const isRequiredFieldMissing = useMemo(() => {
+    // Practitioner must be chosen
+    if (!practitioner || !practitioner.___USR) return true;
+
+    // NPI must be present
+    if (!isValidRequiredValue(ivr?.account?.NPI)) return true;
+
+    // Product required
+    if (!products) return true;
+
+    // Primary Payor
+    if (!isValidRequiredValue(selectedCompany)) return true;
+
+    // Primary Member & Group required
+    if (!isValidRequiredValue(primaryMemberNumber)) return true;
+    if (!isValidRequiredValue(primaryGroupNumber)) return true;
+
+    // At least one ICD code is required (iCode, lCode, eCode, cdCode)
+    const iCodeValid = isValidRequiredValue(iCode);
+    const lCodeValid = isValidRequiredValue(lCode);
+    const eCodeValid = isValidRequiredValue(eCode);
+    const cdCodeValid = isValidRequiredValue(cdCode);
+    const isAtLeastOneICDCodeFilled =
+      iCodeValid || lCodeValid || eCodeValid || cdCodeValid;
+    if (!isAtLeastOneICDCodeFilled) return true;
+
+    // CPT Code 1 & Wound Size 1 must be valid
+    if (!isValidRequiredValue(cptCode)) return true;
+    if (!isPositiveNumber(cptWoundSize1)) return true;
+
+    // (CPT Code 2 & Wound Size 2 are optional – remove these checks)
+
+    return false;
+  }, [
+    practitioner,
+    ivr?.account?.NPI,
+    products,
+    selectedCompany,
+    primaryMemberNumber,
+    primaryGroupNumber,
+    iCode,
+    lCode,
+    eCode,
+    cdCode,
+    cptCode,
+    cptWoundSize1,
+  ]);
+
+  const isSubmitDisabled = isRequiredFieldMissing || isReadOnly;
+
+  // -----------------------------------------------------
+  // Render
   // -----------------------------------------------------
   if (loading) {
     return (
@@ -571,6 +635,7 @@ const CustomField = (props: CustomFieldProps) => {
   return (
     <Box>
       <Button
+        id="open-ivr-btn"
         fullWidth
         onClick={handleButtonClick}
         style={{
@@ -582,6 +647,7 @@ const CustomField = (props: CustomFieldProps) => {
       </Button>
 
       <Dialog
+        id="ivr-dialog"
         open={dialogOpen}
         onClose={handleDialogClose}
         fullWidth
@@ -599,6 +665,7 @@ const CustomField = (props: CustomFieldProps) => {
         </DialogTitle>
 
         <DialogContent
+          id="ivr-dialog-content"
           style={{ maxWidth: "100%", overflowX: "hidden", padding: "10px" }}
         >
           <Box
@@ -618,13 +685,18 @@ const CustomField = (props: CustomFieldProps) => {
 
             {/* Practitioner Select */}
             <Select
+              id="practitioner-select"
               fullWidth
-              value={practitioner}
+              value={practitioner || ""}
               onChange={handlePractitioner}
               disabled={isReadOnly}
             >
               {practitionerList.map((pr) => (
-                <MenuItem key={pr.___USR} value={pr}>
+                <MenuItem
+                  id={`practitioner-${pr.___USR}`}
+                  key={pr.___USR}
+                  value={pr}
+                >
                   {pr.NameFull}
                 </MenuItem>
               ))}
@@ -632,23 +704,29 @@ const CustomField = (props: CustomFieldProps) => {
 
             {/* NPI Field */}
             <TextField
+              id="npi-field"
               label="NPI"
               fullWidth
               margin="dense"
               size="small"
-              value={ivr.account?.NPI}
+              value={ivr.account?.NPI || ""}
               disabled={isReadOnly}
             />
 
             {/* Product Select */}
             <Select
+              id="product-select"
               fullWidth
-              value={products}
+              value={products || ""}
               onChange={handleProductChange}
               disabled={isReadOnly}
             >
               {productsList.map((product) => (
-                <MenuItem key={product?.QCode} value={product}>
+                <MenuItem
+                  id={`product-${product?.QCode}`}
+                  key={product?.QCode}
+                  value={product}
+                >
                   {product?.Name}
                 </MenuItem>
               ))}
@@ -656,6 +734,7 @@ const CustomField = (props: CustomFieldProps) => {
 
             {/* Primary Payor */}
             <Autocomplete
+              id="primary-payor-select"
               options={[...CompanyNames, "Other"]}
               getOptionLabel={(option) => option}
               value={selectedCompany}
@@ -672,6 +751,7 @@ const CustomField = (props: CustomFieldProps) => {
             />
 
             <TextField
+              id="primary-member-number"
               label="Primary Member Number"
               fullWidth
               margin="dense"
@@ -682,6 +762,7 @@ const CustomField = (props: CustomFieldProps) => {
             />
 
             <TextField
+              id="primary-group-number"
               label="Primary Group Number"
               fullWidth
               margin="dense"
@@ -691,8 +772,9 @@ const CustomField = (props: CustomFieldProps) => {
               disabled={isReadOnly}
             />
 
-            {/* Secondary Payor */}
+            {/* Secondary Payor (Optional) */}
             <Autocomplete
+              id="secondary-payor-select"
               options={[...CompanyNames, "Other"]}
               getOptionLabel={(option) => option}
               value={selectedCompanySecond}
@@ -709,6 +791,7 @@ const CustomField = (props: CustomFieldProps) => {
             />
 
             <TextField
+              id="secondary-member-number"
               label="Secondary Member Number"
               fullWidth
               margin="dense"
@@ -719,6 +802,7 @@ const CustomField = (props: CustomFieldProps) => {
             />
 
             <TextField
+              id="secondary-group-number"
               label="Secondary Group Number"
               fullWidth
               margin="dense"
@@ -728,27 +812,14 @@ const CustomField = (props: CustomFieldProps) => {
               disabled={isReadOnly}
             />
 
-            <Grid container spacing={1} marginTop={1}>
-              {products && products.length > 0 && products[0]?.name && (
-                <Grid item xs={6}>
-                  <Typography variant="body1">Product 1</Typography>
-                  <Typography variant="body2">{products[0].name}</Typography>
-                </Grid>
-              )}
-              {products && products.length > 1 && products[1]?.name && (
-                <Grid item xs={6}>
-                  <Typography variant="body1">Product 2</Typography>
-                  <Typography variant="body2">{products[1].name}</Typography>
-                </Grid>
-              )}
-            </Grid>
-
+            {/* ICD10 Codes */}
             <Typography variant="h6" mt={3}>
               ICD10 Codes:
             </Typography>
-            <Grid container spacing={2} marginTop={1}>
-              <Grid item xs={3}>
+            <Grid container spacing={2} marginTop={1} id="grid-container-1">
+              <Grid item xs={3} id="grid-item-Icode">
                 <Autocomplete
+                  id="i-code-select"
                   options={iCodes}
                   getOptionLabel={(option) => option}
                   value={iCode}
@@ -759,8 +830,9 @@ const CustomField = (props: CustomFieldProps) => {
                   )}
                 />
               </Grid>
-              <Grid item xs={3}>
+              <Grid item xs={3} id="grid-item-Lcode">
                 <Autocomplete
+                  id="l-code-select"
                   options={lCodes}
                   getOptionLabel={(option) => option}
                   value={lCode}
@@ -771,8 +843,9 @@ const CustomField = (props: CustomFieldProps) => {
                   )}
                 />
               </Grid>
-              <Grid item xs={3}>
+              <Grid item xs={3} id="grid-item-Ecode">
                 <Autocomplete
+                  id="e-code-select"
                   options={eCodes}
                   getOptionLabel={(option) => option}
                   value={eCode}
@@ -783,8 +856,9 @@ const CustomField = (props: CustomFieldProps) => {
                   )}
                 />
               </Grid>
-              <Grid item xs={3}>
+              <Grid item xs={3} id="grid-item-CDcode">
                 <Autocomplete
+                  id="cd-code-select"
                   options={mohsCodes}
                   getOptionLabel={(option) => option}
                   value={cdCode}
@@ -797,12 +871,14 @@ const CustomField = (props: CustomFieldProps) => {
               </Grid>
             </Grid>
 
+            {/* CPT Codes */}
             <Typography variant="h6" mt={3}>
               CPT Code:
             </Typography>
-            <Grid container spacing={2} marginTop={1}>
-              <Grid item>
+            <Grid container spacing={2} marginTop={1} id="grid-container-2">
+              <Grid item id="grid-item-WoundSize-1">
                 <TextField
+                  id="wound-size-1"
                   label="Wound Size 1"
                   type="number"
                   variant="outlined"
@@ -812,8 +888,9 @@ const CustomField = (props: CustomFieldProps) => {
                   disabled={isReadOnly}
                 />
               </Grid>
-              <Grid item>
+              <Grid item id="grid-item-CPTcode-1">
                 <Autocomplete
+                  id="cpt-code-1"
                   options={cptCodes}
                   getOptionLabel={(option) => option}
                   value={cptCode}
@@ -829,8 +906,9 @@ const CustomField = (props: CustomFieldProps) => {
                   )}
                 />
               </Grid>
-              <Grid item>
+              <Grid item id="grid-item-WoundSize-2">
                 <TextField
+                  id="wound-size-2"
                   label="Wound Size 2"
                   type="number"
                   variant="outlined"
@@ -840,8 +918,9 @@ const CustomField = (props: CustomFieldProps) => {
                   disabled={isReadOnly}
                 />
               </Grid>
-              <Grid item>
+              <Grid item id="grid-item-CPTcode-2">
                 <Autocomplete
+                  id="cpt-code-2"
                   options={cptCodes}
                   getOptionLabel={(option) => option}
                   value={cptCode2}
@@ -859,14 +938,15 @@ const CustomField = (props: CustomFieldProps) => {
               </Grid>
             </Grid>
 
+            {/* Documents Section (Not Required) */}
             <Typography variant="h6" mt={3}>
               Documents:
             </Typography>
-
             {documents.length > 0 ? (
-              <List>
+              <List id="documents-list">
                 {documents?.map((item, index) => (
                   <ListItemButton
+                    id={`document-item-${index}`}
                     key={index}
                     onClick={() => handleSecondDialogOpen(item)}
                     sx={{
@@ -881,25 +961,16 @@ const CustomField = (props: CustomFieldProps) => {
                     }}
                   >
                     <Typography variant="body2">{item?.Name}</Typography>
-
-                    {/* Only show Delete if not read-only */}
-                    {!isReadOnly ? (
-                      isDeleting ? (
-                        <CircularProgress size={20} style={{ marginLeft: 5 }} />
-                      ) : (
-                        <Typography
-                          variant="body1"
-                          color="#EC5750"
-                          style={{ zIndex: "99" }}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteDocument(item, index);
-                          }}
-                        >
-                          Delete
-                        </Typography>
-                      )
-                    ) : null}
+                    {!isReadOnly && (
+                      <Delete
+                        id={`delete-document-${index}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteDocument(item, index);
+                        }}
+                        style={{ color: "#EC5750", cursor: "pointer" }}
+                      />
+                    )}
                   </ListItemButton>
                 ))}
               </List>
@@ -909,8 +980,8 @@ const CustomField = (props: CustomFieldProps) => {
               </Typography>
             )}
 
-            {/* Add Documents button is disabled if read-only */}
             <Button
+              id="add-documents-btn"
               onClick={handleDocumentDialogOpen}
               style={{
                 width: "150px",
@@ -925,12 +996,13 @@ const CustomField = (props: CustomFieldProps) => {
               Add Documents
             </Button>
 
+            {/* Reasons and Comments (Not Required) */}
             <Box display="flex" flexDirection="column">
               <Typography variant="h6" mt={3} mb={3}>
                 Reasons:
               </Typography>
-              {/* These were already disabled, but let's rely on our isReadOnly */}
               <TextField
+                id="reasons-input"
                 rows={3}
                 value={reasons}
                 multiline
@@ -945,6 +1017,7 @@ const CustomField = (props: CustomFieldProps) => {
                 Comments:
               </Typography>
               <TextField
+                id="comments-input"
                 rows={3}
                 value={comment}
                 multiline
@@ -956,7 +1029,7 @@ const CustomField = (props: CustomFieldProps) => {
               />
             </Box>
 
-            {/* Footer Action Buttons */}
+            {/* Action Buttons */}
             <Box
               style={{
                 position: "absolute",
@@ -972,6 +1045,7 @@ const CustomField = (props: CustomFieldProps) => {
               }}
             >
               <Button
+                id="close-ivr-btn"
                 onClick={handleDialogClose}
                 style={{
                   width: "100px",
@@ -985,10 +1059,10 @@ const CustomField = (props: CustomFieldProps) => {
                 Close
               </Button>
 
-              {/* Hide Save and Submit if read-only */}
               {!isReadOnly && (
                 <>
                   <Button
+                    id="save-ivr-btn"
                     onClick={() => handleSubmit(null)}
                     style={{
                       width: "100px",
@@ -1002,14 +1076,17 @@ const CustomField = (props: CustomFieldProps) => {
                     Save
                   </Button>
                   <Button
+                    id="submit-ivr-btn"
                     onClick={() => handleSubmit(1)}
+                    disabled={isSubmitDisabled}
                     style={{
                       width: "100px",
                       height: "50px",
                       borderRadius: "0px",
-                      background: "#14706A",
+                      background: isSubmitDisabled ? "#aaa" : "#14706A",
                       color: "white",
                       marginRight: "20px",
+                      cursor: isSubmitDisabled ? "not-allowed" : "pointer",
                     }}
                   >
                     Submit
@@ -1019,8 +1096,9 @@ const CustomField = (props: CustomFieldProps) => {
             </Box>
           </Box>
 
-          {/* --------------------------------- Previewing Documents Dialog ------------------------------- */}
+          {/* Document Preview Dialog */}
           <Dialog
+            id="document-preview-dialog"
             open={secondDialogOpen}
             onClose={handleSecondDialogClose}
             PaperProps={{
@@ -1036,6 +1114,7 @@ const CustomField = (props: CustomFieldProps) => {
                 getMimeTypeFromDataUri(selectedDocument.Base64) ===
                 "application/pdf" ? (
                   <iframe
+                    id="pdf-preview-frame"
                     src={selectedDocument.Base64}
                     title="PDF Document"
                     width="100%"
@@ -1044,6 +1123,7 @@ const CustomField = (props: CustomFieldProps) => {
                   />
                 ) : (
                   <img
+                    id="image-preview"
                     src={selectedDocument.Base64}
                     alt="Document"
                     style={{
@@ -1060,21 +1140,26 @@ const CustomField = (props: CustomFieldProps) => {
               )}
             </DialogContent>
             <DialogActions>
-              <Button onClick={handleSecondDialogClose} color="primary">
+              <Button
+                id="close-preview-btn"
+                onClick={handleSecondDialogClose}
+                color="primary"
+              >
                 Close
               </Button>
             </DialogActions>
           </Dialog>
 
-          {/* -------------------------- Adding Documents Dialog Box ----------------------------------- */}
+          {/* Upload Document Dialog */}
           <Dialog
+            id="document-upload-dialog"
             open={documentDialogOpen}
             onClose={handleDocumentDialogClose}
           >
             <DialogTitle>Upload Document</DialogTitle>
             <DialogContent style={{ width: "400px" }}>
-              {/* Document Name */}
               <TextField
+                id="document-name-input"
                 fullWidth
                 margin="normal"
                 label="Set Document Name"
@@ -1090,7 +1175,6 @@ const CustomField = (props: CustomFieldProps) => {
                 }}
               />
 
-              {/* Document Type */}
               <FormControl
                 fullWidth
                 margin="normal"
@@ -1099,6 +1183,7 @@ const CustomField = (props: CustomFieldProps) => {
               >
                 <InputLabel id="document-type-label">Document Type</InputLabel>
                 <Select
+                  id="document-type-select"
                   labelId="document-type-label"
                   value={documentType}
                   onChange={(e) => {
@@ -1107,22 +1192,32 @@ const CustomField = (props: CustomFieldProps) => {
                   }}
                   label="Document Type"
                 >
-                  <MenuItem value="facesheet">Facesheet</MenuItem>
-                  <MenuItem value="wound notes">Wound Notes</MenuItem>
-                  <MenuItem value="identification">Identification</MenuItem>
-                  <MenuItem value="priorAuthorization">
+                  <MenuItem id="doc-type-facesheet" value="facesheet">
+                    Facesheet
+                  </MenuItem>
+                  <MenuItem id="doc-type-wound" value="wound notes">
+                    Wound Notes
+                  </MenuItem>
+                  <MenuItem id="doc-type-id" value="identification">
+                    Identification
+                  </MenuItem>
+                  <MenuItem id="doc-type-auth" value="priorAuthorization">
                     Prior Authorization
                   </MenuItem>
-                  <MenuItem value="other">Other</MenuItem>
+                  <MenuItem id="doc-type-other" value="other">
+                    Other
+                  </MenuItem>
                 </Select>
                 {errors.documentType && (
-                  <FormHelperText>Document type is required</FormHelperText>
+                  <FormHelperText>
+                    Document type is required
+                  </FormHelperText>
                 )}
               </FormControl>
 
-              {/* Other Document Type if "other" */}
               {documentType === "other" && (
                 <TextField
+                  id="other-document-type-input"
                   fullWidth
                   margin="normal"
                   label="Specify Document Type"
@@ -1145,6 +1240,7 @@ const CustomField = (props: CustomFieldProps) => {
               )}
 
               <input
+                id="file-upload-input"
                 type="file"
                 accept="image/jpeg,image/png,application/pdf"
                 onChange={handleFileChange}
@@ -1157,10 +1253,18 @@ const CustomField = (props: CustomFieldProps) => {
               )}
             </DialogContent>
             <DialogActions>
-              <Button onClick={handleDocumentDialogClose} color="primary">
+              <Button
+                id="cancel-upload-btn"
+                onClick={handleDocumentDialogClose}
+                color="primary"
+              >
                 Cancel
               </Button>
-              <Button onClick={handleDocumentDialogSubmit} color="primary">
+              <Button
+                id="confirm-upload-btn"
+                onClick={handleDocumentDialogSubmit}
+                color="primary"
+              >
                 Upload
               </Button>
             </DialogActions>
